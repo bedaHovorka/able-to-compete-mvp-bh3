@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, MoreVertical, Layout, Trello } from 'lucide-react'
+import { Plus, Layout, Trello } from 'lucide-react'
 import { boards, lists, cards } from '../lib/api'
-import { Row, Col, Card, Button, Form, InputGroup, Badge, Modal } from 'react-bootstrap'
+import { Row, Col, Card, Button, Form, Badge, Modal } from 'react-bootstrap'
 
 export default function TaskBoard() {
   const queryClient = useQueryClient()

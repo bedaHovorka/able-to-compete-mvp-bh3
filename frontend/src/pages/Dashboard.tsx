@@ -226,9 +226,9 @@ export default function Dashboard() {
               </div>
 
               <div className="text-center mt-3">
-                <Button variant="outline-primary" size="sm" as={Link} to="/status">
+                <Link to="/status" className="btn btn-outline-primary btn-sm">
                   View Status Page <ArrowRight size={16} className="ms-1" />
-                </Button>
+                </Link>
               </div>
             </Card.Body>
           </Card>
