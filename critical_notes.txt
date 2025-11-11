@@ -1,0 +1,89 @@
+Must-Have Features for Evaluation:
+
+Task Management: Functional board with lists and cards
+Monitoring: At least 3 monitors with real checks
+Incident Response: Automatic incident creation on failures
+Audit Logging: Every action logged with timestamp and user
+Status Page: Public view of system status
+Real-time Updates: WebSocket for live updates
+AI Integration: At least one working AI agent
+Testing: BDD tests that actually run
+Dashboard: Analytics view with metrics
+Deployment: Working Docker setup
+
+Performance Optimizations:
+
+Use connection pooling for database
+Implement caching with Redis for frequent queries
+Batch operations where possible
+Use async/await throughout
+Implement pagination on all list endpoints
+
+Security Essentials:
+
+JWT authentication on all protected endpoints
+Input validation with Pydantic
+SQL injection prevention via ORM
+Rate limiting on API endpoints
+CORS properly configured
+
+Quick Wins for Demo:
+
+Seed data generator for impressive demo
+Beautiful dashboard with animated charts
+Smooth drag-and-drop with animations
+Real-time notification toasts
+Professional status page design
+AI-generated incident summaries
+
+Deployment Instructions
+
+Local Testing:
+
+bashcd backend
+python -m pytest tests/ --bdd
+uvicorn app.main:app --reload
+
+Deploy to Railway/Render:
+
+bash# Push to GitHub
+git init
+git add .
+git commit -m "Initial MVP"
+git push origin main
+
+# Connect to Railway/Render
+# Deploy with environment variables
+
+Demo Video Script:
+
+
+Show task board creation and card management
+Demonstrate monitoring setup and live checks
+Trigger an incident and show alerts
+Display audit log and compliance features
+Showcase AI agent generating tests
+Show real-time collaboration features
+
+Time Management
+
+
+Hour 1: APIs + Services + Testing
+Hour 2: AI Agents + WebSocket + Frontend basics
+Hour 3: Frontend completion + Deployment
+Hour 4: Testing + Demo video + Documentation
+
+Success Criteria Checklist
+
+ Both Trello and Betterstack features work
+ AI agents demonstrate automation
+ BDD/TDD tests are implemented
+ Audit logging is comprehensive
+ Monitoring shows real metrics
+ Incident response is automatic
+ Code appears human-written and professional
+ System is deployed and accessible
+ Demo video clearly shows all features
+ Documentation is clear and complete
+
+Remember: Focus on working features over perfection. The judges want to see AI-accelerated development that produces a functional system quickly.

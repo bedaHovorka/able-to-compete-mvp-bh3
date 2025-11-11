@@ -1,0 +1,19 @@
+Claude Code Instructions: Able to Compete 100K Challenge MVP
+Project Overview
+Build an AI-first MVP combining task management (Trello-like) and operational reliability monitoring (Betterstack-like) in Python. Time limit: 3-5 hours.
+Deliverables Required:
+
+GitHub repository with full code
+Live deployed URL
+Demo video
+1-page description
+
+Technology Stack
+
+Backend: Python 3.11+ with FastAPI
+Database: PostgreSQL with SQLAlchemy ORM (or MongoDB with Motor for faster setup)
+Real-time: WebSockets via FastAPI
+Task Queue: Celery with Redis (or simple asyncio for MVP)
+Frontend: React with TypeScript and Tailwind CSS
+Deployment: Docker + Railway/Render/Fly.io
+Testing: pytest with pytest-bdd for BDD/TDD
