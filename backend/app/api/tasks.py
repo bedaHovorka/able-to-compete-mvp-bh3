@@ -75,6 +75,30 @@ class CardResponse(BaseModel):
         from_attributes = True
 
 
+class ListWithCardsResponse(BaseModel):
+    id: uuid.UUID
+    board_id: uuid.UUID
+    name: str
+    position: int
+    created_at: datetime
+    cards: List[CardResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class BoardWithListsResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    lists: List[ListWithCardsResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
 class ActivityResponse(BaseModel):
     id: uuid.UUID
     action: str
@@ -116,20 +140,20 @@ async def list_boards(
     return boards
 
 
-@router.get("/boards/{board_id}", response_model=BoardResponse)
+@router.get("/boards/{board_id}")
 async def get_board(
     board_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Get board by ID"""
+    """Get board by ID with lists and cards"""
     board = await TaskService.get_board(db, board_id)
     if not board:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Board not found"
         )
-    return board
+    return BoardWithListsResponse.model_validate(board)
 
 
 @router.put("/boards/{board_id}", response_model=BoardResponse)

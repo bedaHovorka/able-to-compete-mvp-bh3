@@ -1,9 +1,11 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Trello, Activity, LogOut } from 'lucide-react'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
+import { LayoutDashboard, Trello, Activity, LogOut, User, Bell } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
+import { Navbar, Container, Nav, NavDropdown } from 'react-bootstrap'
 
 export default function Layout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuthStore()
 
   const handleLogout = () => {
@@ -11,48 +13,98 @@ export default function Layout() {
     navigate('/login')
   }
 
+  const isActive = (path: string) => location.pathname === path
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-primary-600">AbleToCompete</h1>
-              </div>
-              <div className="ml-10 flex space-x-8">
-                <Link to="/" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500">
-                  <LayoutDashboard className="w-4 h-4 mr-2" />
-                  Dashboard
-                </Link>
-                <Link to="/boards" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent hover:border-primary-500">
-                  <Trello className="w-4 h-4 mr-2" />
-                  Boards
-                </Link>
-                <Link to="/monitoring" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900 border-b-2 border-transparent hover:border-primary-500">
-                  <Activity className="w-4 h-4 mr-2" />
-                  Monitoring
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <span className="text-sm text-gray-700 mr-4">{user?.email}</span>
-              <button onClick={handleLogout} className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700">
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-vh-100 d-flex flex-column">
+      {/* Top Navbar */}
+      <Navbar expand="lg" sticky="top" className="bg-white shadow-sm border-bottom">
+        <Container fluid>
+          <Navbar.Brand as={Link} to="/" className="d-flex align-items-center">
+            <span className="text-gradient-primary fw-bold fs-4">AbleToCompete</span>
+          </Navbar.Brand>
+
+          <Navbar.Toggle aria-controls="navbar-nav" />
+
+          <Navbar.Collapse id="navbar-nav">
+            <Nav className="mx-auto">
+              <Nav.Link
+                as={Link}
+                to="/"
+                className={isActive('/') || isActive('/dashboard') ? 'active' : ''}
+              >
+                <LayoutDashboard size={18} className="me-2" style={{ verticalAlign: 'sub' }} />
+                Dashboard
+              </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/tasks"
+                className={isActive('/tasks') ? 'active' : ''}
+              >
+                <Trello size={18} className="me-2" style={{ verticalAlign: 'sub' }} />
+                Task Board
+              </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/monitoring"
+                className={isActive('/monitoring') ? 'active' : ''}
+              >
+                <Activity size={18} className="me-2" style={{ verticalAlign: 'sub' }} />
+                Monitoring
+              </Nav.Link>
+            </Nav>
+
+            <Nav className="align-items-center">
+              <Nav.Link href="#notifications" className="position-relative me-2">
+                <Bell size={20} />
+                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{ fontSize: '0.65rem' }}>
+                  3
+                </span>
+              </Nav.Link>
+
+              <NavDropdown
+                title={
+                  <span>
+                    <User size={18} className="me-1" style={{ verticalAlign: 'sub' }} />
+                    {user?.email || 'User'}
+                  </span>
+                }
+                id="user-dropdown"
+                align="end"
+              >
+                <NavDropdown.Item href="#profile">
+                  <User size={16} className="me-2" />
+                  Profile
+                </NavDropdown.Item>
+                <NavDropdown.Item href="#settings">
+                  Settings
+                </NavDropdown.Item>
+                <NavDropdown.Divider />
+                <NavDropdown.Item onClick={handleLogout}>
+                  <LogOut size={16} className="me-2" />
+                  Logout
+                </NavDropdown.Item>
+              </NavDropdown>
+            </Nav>
+          </Navbar.Collapse>
+        </Container>
+      </Navbar>
 
       {/* Main Content */}
-      <main className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="flex-grow-1 py-4 animate-fade-in">
+        <Container fluid>
           <Outlet />
-        </div>
+        </Container>
       </main>
+
+      {/* Footer */}
+      <footer className="footer text-center">
+        <Container>
+          <small className="text-muted">
+            © 2025 AbleToCompete MVP - Built with ❤️ for the 100K Challenge
+          </small>
+        </Container>
+      </footer>
     </div>
   )
 }

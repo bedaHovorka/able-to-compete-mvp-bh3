@@ -21,7 +21,7 @@ function App() {
 
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Dashboard />} />
-        <Route path="boards" element={<TaskBoard />} />
+        <Route path="tasks" element={<TaskBoard />} />
         <Route path="monitoring" element={<Monitoring />} />
       </Route>
 

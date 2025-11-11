@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { auth } from '../lib/api'
+import { Sparkles, Lock, Mail, ArrowRight, Zap, AlertCircle } from 'lucide-react'
+import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -30,64 +32,106 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">
-            AbleToCompete
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-danger-50 border border-danger-200 text-danger-700 px-4 py-3 rounded">
-                {error}
+    <div className="login-container">
+      <Container>
+        <Row className="justify-content-center">
+          <Col xs={12} sm={10} md={8} lg={5}>
+            <div className="text-center mb-4 animate-scale-in">
+              <div className="d-inline-flex align-items-center justify-content-center bg-white rounded-circle shadow-lg mb-3" style={{ width: '80px', height: '80px' }}>
+                <Sparkles className="text-primary" size={40} />
               </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                placeholder="demo@example.com"
-              />
+              <h1 className="text-white fw-bold mb-2" style={{ fontSize: '2.5rem' }}>
+                AbleToCompete
+              </h1>
+              <p className="text-white-50 mb-0 fs-5">Welcome to the 100K Challenge</p>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                placeholder="Enter any password (demo)"
-              />
-            </div>
+            <Card className="login-card shadow-lg animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              <Card.Body className="p-5">
+                <h3 className="text-center mb-2 fw-bold">Sign In</h3>
+                <p className="text-center text-muted mb-4">Enter your credentials to access your account</p>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
+                <Form onSubmit={handleSubmit}>
+                  {error && (
+                    <Alert variant="danger" className="d-flex align-items-center">
+                      <AlertCircle size={20} className="me-2" />
+                      {error}
+                    </Alert>
+                  )}
 
-          <p className="mt-4 text-center text-sm text-gray-600">
-            Demo: Use any email/password combination
-          </p>
-        </div>
-      </div>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Email Address</Form.Label>
+                    <div className="position-relative">
+                      <Mail className="position-absolute text-muted" size={20} style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }} />
+                      <Form.Control
+                        type="email"
+                        placeholder="demo@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="ps-5"
+                        style={{ height: '50px' }}
+                      />
+                    </div>
+                  </Form.Group>
+
+                  <Form.Group className="mb-4">
+                    <Form.Label className="fw-semibold">Password</Form.Label>
+                    <div className="position-relative">
+                      <Lock className="position-absolute text-muted" size={20} style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', zIndex: 10 }} />
+                      <Form.Control
+                        type="password"
+                        placeholder="Enter any password (demo)"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="ps-5"
+                        style={{ height: '50px' }}
+                      />
+                    </div>
+                  </Form.Group>
+
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={loading}
+                    className="w-100 d-flex align-items-center justify-content-center"
+                    style={{ height: '50px', fontSize: '1.1rem' }}
+                  >
+                    {loading ? (
+                      <>
+                        <Spinner animation="border" size="sm" className="me-2" />
+                        Signing in...
+                      </>
+                    ) : (
+                      <>
+                        Sign in
+                        <ArrowRight size={20} className="ms-2" />
+                      </>
+                    )}
+                  </Button>
+                </Form>
+
+                <Alert variant="info" className="mt-4 mb-0 border-0 bg-primary bg-opacity-10">
+                  <div className="d-flex align-items-start">
+                    <Zap className="text-primary me-2 flex-shrink-0" size={20} />
+                    <div>
+                      <strong className="text-primary d-block mb-1">Demo Mode Active</strong>
+                      <small className="text-muted">
+                        Use any email and password combination to login and explore the application.
+                      </small>
+                    </div>
+                  </div>
+                </Alert>
+              </Card.Body>
+            </Card>
+
+            <p className="text-center text-white-50 mt-4 mb-0">
+              Built with 💙 for the Able to Compete Challenge
+            </p>
+          </Col>
+        </Row>
+      </Container>
     </div>
   )
 }
