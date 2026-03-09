@@ -75,7 +75,7 @@ export const monitors = {
   create: (data: { name: string; url: string; interval?: number }) =>
     api.post<Monitor>('/monitors', data),
   uptime: (id: string, hours: number = 24) =>
-    api.get<{ uptime: number }>(`/monitors/${id}/uptime`, { params: { hours } }),
+    api.get<{ uptime_percentage: number; total_checks: number; failed_checks: number; avg_response_time: number | null }>(`/monitors/${id}/uptime`, { params: { hours } }),
   check: (id: string) => api.post<CheckResponse>(`/monitors/${id}/check`),
 }
 
