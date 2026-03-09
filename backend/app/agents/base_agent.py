@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from app.config import settings
 from app.utils.logger import logger
-import httpx
-import json
 
 
 class BaseAgent(ABC):
@@ -34,26 +32,6 @@ class BaseAgent(ABC):
 
         messages.extend(self.conversation_history)
         messages.append({"role": "user", "content": prompt})
-
-        # For MVP, return simulated response
-        # In production, uncomment below to use actual API:
-        """
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": 0.7
-                }
-            )
-            result = response.json()
-            return result["choices"][0]["message"]["content"]
-        """
 
         # Simulated response for MVP
         logger.info(f"AI Agent called with prompt: {prompt[:100]}...")

@@ -72,9 +72,6 @@ class AlertService:
         }
 
         logger.info(f"[WEBHOOK] Alert sent for incident {incident.id}")
-        # Uncomment to actually send webhook:
-        # async with httpx.AsyncClient() as client:
-        #     await client.post(webhook_url, json=payload)
 
     async def _send_sms_alert(self, incident: Incident, monitor: Monitor):
         """Simulate sending SMS alert"""

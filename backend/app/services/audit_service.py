@@ -1,7 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import Column, String, DateTime, Text, Integer
-from sqlalchemy.dialects.postgresql import UUID, JSON
-from sqlalchemy import select
+from sqlalchemy import Column, String, DateTime, Text, Integer, Uuid, JSON, select
 from app.utils.database import Base
 from app.utils.logger import logger
 from typing import Optional, Dict, Any, List as ListType
@@ -14,12 +12,12 @@ class AuditLog(Base):
     """Audit log model for compliance tracking"""
     __tablename__ = "audit_logs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-    user_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    user_id = Column(Uuid(as_uuid=True), nullable=True, index=True)
     action = Column(String(100), nullable=False, index=True)
     resource_type = Column(String(50), nullable=False, index=True)
-    resource_id = Column(UUID(as_uuid=True), nullable=True)
+    resource_id = Column(Uuid(as_uuid=True), nullable=True)
     method = Column(String(10), nullable=True)  # HTTP method
     endpoint = Column(String(500), nullable=True)
     ip_address = Column(String(50), nullable=True)

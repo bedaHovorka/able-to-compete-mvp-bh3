@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Float, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Float, Enum as SQLEnum, Uuid, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -24,7 +23,7 @@ class MonitorType(str, enum.Enum):
 class Monitor(Base):
     __tablename__ = "monitors"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     type = Column(SQLEnum(MonitorType), nullable=False, default=MonitorType.HTTPS)
     url = Column(String(500), nullable=False)
@@ -46,8 +45,8 @@ class Monitor(Base):
 class Check(Base):
     __tablename__ = "checks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    monitor_id = Column(UUID(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
     status = Column(SQLEnum(MonitorStatus), nullable=False)
     response_time = Column(Float, nullable=True)  # milliseconds
     status_code = Column(Integer, nullable=True)
@@ -74,8 +73,8 @@ class IncidentSeverity(str, enum.Enum):
 class Incident(Base):
     __tablename__ = "incidents"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    monitor_id = Column(UUID(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(SQLEnum(IncidentStatus), nullable=False, default=IncidentStatus.INVESTIGATING)
@@ -83,7 +82,7 @@ class Incident(Base):
     started_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
     acknowledged_at = Column(DateTime, nullable=True)
-    acknowledged_by = Column(UUID(as_uuid=True), nullable=True)
+    acknowledged_by = Column(Uuid(as_uuid=True), nullable=True)
 
     monitor = relationship("Monitor", back_populates="incidents")
     updates = relationship("IncidentUpdate", back_populates="incident", cascade="all, delete-orphan")
@@ -92,11 +91,11 @@ class Incident(Base):
 class IncidentUpdate(Base):
     __tablename__ = "incident_updates"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    incident_id = Column(UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incident_id = Column(Uuid(as_uuid=True), ForeignKey("incidents.id"), nullable=False)
     status = Column(SQLEnum(IncidentStatus), nullable=False)
     message = Column(Text, nullable=False)
-    user_id = Column(UUID(as_uuid=True), nullable=True)
+    user_id = Column(Uuid(as_uuid=True), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     incident = relationship("Incident", back_populates="updates")
@@ -105,7 +104,7 @@ class IncidentUpdate(Base):
 class StatusPage(Base):
     __tablename__ = "status_pages"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     is_public = Column(Boolean, default=True)
@@ -117,8 +116,8 @@ class StatusPage(Base):
 class Metric(Base):
     __tablename__ = "metrics"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    monitor_id = Column(UUID(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
     uptime_percentage = Column(Float, nullable=False)
     avg_response_time = Column(Float, nullable=False)  # milliseconds
     total_checks = Column(Integer, nullable=False)

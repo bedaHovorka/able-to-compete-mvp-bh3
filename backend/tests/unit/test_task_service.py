@@ -387,7 +387,7 @@ class TestTaskServiceActivity:
         # Get activities
         result = await TaskService.get_board_activity(db_session, sample_board.id)
 
-        assert len(result) == 4  # 3 new + 1 from board creation in fixture
+        assert len(result) == 3  # 3 new (fixture creates board directly, no activity)
         assert all(activity.board_id == sample_board.id for activity in result)
 
     async def test_get_board_activity_with_limit(

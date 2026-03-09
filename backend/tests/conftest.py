@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import StaticPool
 from app.utils.database import Base
 from app.models import Board, List, Card
 import uuid
@@ -19,7 +19,8 @@ async def test_engine():
     """Create a test database engine"""
     engine = create_async_engine(
         TEST_DATABASE_URL,
-        poolclass=NullPool,
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
         echo=False
     )
 

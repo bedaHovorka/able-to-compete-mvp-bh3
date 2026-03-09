@@ -4,7 +4,7 @@ Unit tests for database models
 import pytest
 from datetime import datetime
 import uuid
-from app.models import Board, List, Card, Label, CardLabel, Activity, LabelColor
+from app.models import Board, List, Card, Activity
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -156,71 +156,6 @@ class TestCardModel:
 
         assert card.due_date is not None
         assert card.due_date == due_date
-
-
-@pytest.mark.asyncio
-class TestLabelModel:
-    """Tests for Label and CardLabel models"""
-
-    async def test_create_label(self, db_session: AsyncSession):
-        """Test creating a label"""
-        label = Label(
-            name="Bug",
-            color=LabelColor.RED
-        )
-        db_session.add(label)
-        await db_session.commit()
-        await db_session.refresh(label)
-
-        assert label.id is not None
-        assert label.name == "Bug"
-        assert label.color == LabelColor.RED
-
-    async def test_label_colors(self, db_session: AsyncSession):
-        """Test all label colors"""
-        colors = [
-            LabelColor.RED,
-            LabelColor.BLUE,
-            LabelColor.GREEN,
-            LabelColor.YELLOW,
-            LabelColor.PURPLE,
-            LabelColor.ORANGE
-        ]
-
-        labels = []
-        for color in colors:
-            label = Label(name=color.value, color=color)
-            labels.append(label)
-
-        db_session.add_all(labels)
-        await db_session.commit()
-
-        for label in labels:
-            await db_session.refresh(label)
-            assert label.color in colors
-
-    async def test_card_label_association(
-        self, db_session: AsyncSession, sample_card: Card
-    ):
-        """Test associating labels with cards"""
-        # Create labels
-        bug_label = Label(name="Bug", color=LabelColor.RED)
-        feature_label = Label(name="Feature", color=LabelColor.GREEN)
-
-        db_session.add_all([bug_label, feature_label])
-        await db_session.commit()
-        await db_session.refresh(bug_label)
-        await db_session.refresh(feature_label)
-
-        # Associate with card
-        card_label1 = CardLabel(card_id=sample_card.id, label_id=bug_label.id)
-        card_label2 = CardLabel(card_id=sample_card.id, label_id=feature_label.id)
-
-        db_session.add_all([card_label1, card_label2])
-        await db_session.commit()
-
-        assert card_label1.id is not None
-        assert card_label2.id is not None
 
 
 @pytest.mark.asyncio

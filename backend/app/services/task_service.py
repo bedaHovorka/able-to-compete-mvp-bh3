@@ -50,7 +50,7 @@ class TaskService:
         ).options(
             selectinload(Board.lists).selectinload(List.cards)
         )
-        result = await db.execute(query)
+        result = await db.execute(query.execution_options(populate_existing=True))
         return result.scalar_one_or_none()
 
     @staticmethod

@@ -50,12 +50,6 @@ class CardCreate(BaseModel):
     position: int = 0
 
 
-class CardUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    completed: Optional[bool] = None
-
-
 class CardMove(BaseModel):
     list_id: uuid.UUID
     position: int
@@ -216,29 +210,6 @@ async def create_list(
     return list_obj
 
 
-@router.put("/lists/{list_id}", response_model=ListResponse)
-async def update_list(
-    list_id: uuid.UUID,
-    list_data: ListCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_active_user)
-):
-    """Update list"""
-    # Implementation here
-    raise HTTPException(status_code=501, detail="Not implemented")
-
-
-@router.delete("/lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_list(
-    list_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_active_user)
-):
-    """Delete list"""
-    # Implementation here
-    raise HTTPException(status_code=501, detail="Not implemented")
-
-
 # Card endpoints
 @router.post("/lists/{list_id}/cards", response_model=CardResponse, status_code=status.HTTP_201_CREATED)
 async def create_card(
@@ -263,18 +234,6 @@ async def create_card(
     return card
 
 
-@router.put("/cards/{card_id}", response_model=CardResponse)
-async def update_card(
-    card_id: uuid.UUID,
-    card_data: CardUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_active_user)
-):
-    """Update card"""
-    # Implementation here
-    raise HTTPException(status_code=501, detail="Not implemented")
-
-
 @router.put("/cards/{card_id}/move", response_model=CardResponse)
 async def move_card(
     card_id: uuid.UUID,
@@ -295,17 +254,6 @@ async def move_card(
             detail="Card not found"
         )
     return card
-
-
-@router.delete("/cards/{card_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_card(
-    card_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_active_user)
-):
-    """Delete card"""
-    # Implementation here
-    raise HTTPException(status_code=501, detail="Not implemented")
 
 
 # Activity log endpoint
