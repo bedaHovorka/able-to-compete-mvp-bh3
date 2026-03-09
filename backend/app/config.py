@@ -25,8 +25,12 @@ class Settings(BaseSettings):
     
     # AI Agents
     ENABLE_AI_AGENTS: bool = True
-    LLM_MODEL: str = "gpt-4"  # or local model
-    
+    LLM_MODEL: str = "claude-sonnet-4-6"
+    ANTHROPIC_API_KEY: Optional[str] = None
+
+    # Alerts
+    WEBHOOK_URL: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"
