@@ -1,7 +1,7 @@
 # backend/app/config.py
 from pydantic_settings import BaseSettings
-from pydantic import model_validator
-from typing import Optional, List
+from pydantic import model_validator, field_validator
+from typing import Optional, List, Any
 
 class Settings(BaseSettings):
     # Application
@@ -21,7 +21,20 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # CORS
+    # Accepts either a JSON array (["url1","url2"]) or a comma-separated string (url1,url2)
     ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            # Strip surrounding brackets in case someone passes ["x","y"] as a plain string
+            stripped = v.strip()
+            if stripped.startswith("["):
+                import json
+                return json.loads(stripped)
+            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        return v
 
     # Monitoring
     MONITOR_CHECK_INTERVAL: int = 30  # seconds

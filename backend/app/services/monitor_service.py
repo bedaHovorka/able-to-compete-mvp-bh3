@@ -18,9 +18,9 @@ class MonitorService:
     def __init__(self):
         pass
 
-    async def create_monitor(self, db: AsyncSession, name: str, url: str, interval: int = 60, monitor_type: str = "https") -> Monitor:
+    async def create_monitor(self, db: AsyncSession, name: str, url: str, interval: int = 60, monitor_type: str = "https", timeout: int = 10, expected_status_code: int = 200) -> Monitor:
         """Create a new monitor"""
-        monitor = Monitor(name=name, url=url, interval=interval, type=monitor_type)
+        monitor = Monitor(name=name, url=url, interval=interval, type=monitor_type, timeout=timeout, expected_status_code=expected_status_code)
         db.add(monitor)
         await db.commit()
         await db.refresh(monitor)
@@ -180,9 +180,12 @@ class MonitorService:
                 try:
                     async with AsyncSessionLocal() as loop_db:
                         fresh_monitor = await self.get_monitor(loop_db, monitor_id)
-                        if fresh_monitor:
-                            await self.execute_check(loop_db, fresh_monitor)
-                    await asyncio.sleep(monitor.interval)
+                        if fresh_monitor is None or not fresh_monitor.enabled:
+                            active_monitors.pop(monitor_id_str, None)
+                            logger.info(f"Monitor {monitor_id} deleted or disabled — stopping loop")
+                            break
+                        await self.execute_check(loop_db, fresh_monitor)
+                    await asyncio.sleep(fresh_monitor.interval)
                 except Exception as e:
                     logger.error(f"Error in monitor loop for {monitor_id}: {e}")
                     await asyncio.sleep(monitor.interval)

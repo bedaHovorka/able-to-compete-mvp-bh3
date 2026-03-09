@@ -169,8 +169,8 @@ cd able-to-compete-mvp-bh3
 
 # Backend (Terminal 1)
 cd backend
-pip3 install -r requirements.txt
-python3.11 -m uvicorn app.main:app --port 8005 --reload
+uv sync
+uv run uvicorn app.main:app --port 8005 --reload
 
 # Frontend (Terminal 2)
 cd frontend

@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 from app.models import Board, List, Card, Activity
 from app.utils.logger import logger
@@ -79,22 +79,14 @@ class TaskService:
 
         now = datetime.utcnow()
 
-        # Fetch all lists belonging to this board
-        lists_result = await db.execute(select(List).where(List.board_id == board_id))
-        lists = lists_result.scalars().all()
+        # Collect list IDs for this board
+        lists_result = await db.execute(select(List.id).where(List.board_id == board_id))
+        list_ids = lists_result.scalars().all()
 
-        list_ids = [lst.id for lst in lists]
-
-        # Hard-delete all Cards in those lists (Card has no deleted_at)
+        # Bulk hard-delete all Cards and Lists (neither has deleted_at)
         if list_ids:
-            cards_result = await db.execute(select(Card).where(Card.list_id.in_(list_ids)))
-            cards = cards_result.scalars().all()
-            for card in cards:
-                await db.delete(card)
-
-            # Hard-delete all Lists (List has no deleted_at)
-            for lst in lists:
-                await db.delete(lst)
+            await db.execute(delete(Card).where(Card.list_id.in_(list_ids)))
+            await db.execute(delete(List).where(List.board_id == board_id))
 
         # Soft-delete the board itself
         board.deleted_at = now

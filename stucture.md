@@ -39,7 +39,7 @@ able-to-compete-mvp/
 │   │   ├── step_defs/
 │   │   │   └── test_steps.py
 │   │   └── unit/
-│   ├── requirements.txt
+│   ├── pyproject.toml       # Python dependencies (managed with uv)
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/

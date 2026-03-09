@@ -72,7 +72,9 @@ async def create_monitor(
         name=monitor_data.name,
         url=str(monitor_data.url),
         interval=monitor_data.interval,
-        monitor_type=monitor_data.type
+        monitor_type=monitor_data.type,
+        timeout=monitor_data.timeout,
+        expected_status_code=monitor_data.expected_status_code,
     )
     return monitor
 
