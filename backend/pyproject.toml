@@ -40,3 +40,11 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+    "httpx>=0.25.1",
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+]
+
