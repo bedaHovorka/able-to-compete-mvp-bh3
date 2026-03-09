@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
-import type { Board, List, Card, Monitor, StatusData } from '../types'
+import type { Board, List, Card, Monitor, StatusData, ActivityEntry } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -48,6 +48,8 @@ export const boards = {
   update: (id: string, data: { name: string; description?: string }) =>
     api.put<Board>(`/boards/${id}`, data),
   delete: (id: string) => api.delete(`/boards/${id}`),
+  activity: (boardId: string, limit = 20) =>
+    api.get<ActivityEntry[]>(`/boards/${boardId}/activity?limit=${limit}`),
 }
 
 export const lists = {

@@ -48,3 +48,12 @@ export interface StatusData {
   monitors: Monitor[]
   last_updated: string
 }
+
+export interface ActivityEntry {
+  id: string
+  action: string
+  entity_type: string
+  entity_id: string
+  details: string
+  timestamp: string
+}
