@@ -1,17 +1,8 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Uuid, Table, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Uuid
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 from app.utils.database import Base
-
-
-# Association table for many-to-many between cards and labels
-card_labels = Table(
-    "card_labels",
-    Base.metadata,
-    Column("card_id", Uuid(as_uuid=True), ForeignKey("cards.id", ondelete="CASCADE"), primary_key=True),
-    Column("label_id", Uuid(as_uuid=True), ForeignKey("labels.id", ondelete="CASCADE"), primary_key=True),
-)
 
 
 class Board(Base):
@@ -27,7 +18,6 @@ class Board(Base):
 
     lists = relationship("List", back_populates="board", cascade="all, delete-orphan")
     activities = relationship("Activity", back_populates="board", cascade="all, delete-orphan")
-    labels = relationship("Label", back_populates="board", cascade="all, delete-orphan")
 
 
 class List(Base):
@@ -58,7 +48,20 @@ class Card(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     list = relationship("List", back_populates="cards")
-    labels = relationship("Label", secondary="card_labels", back_populates="cards")
+    comments = relationship("Comment", back_populates="card", cascade="all, delete-orphan")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    card_id = Column(Uuid(as_uuid=True), ForeignKey("cards.id"), nullable=False, index=True)
+    user_id = Column(Uuid(as_uuid=True), nullable=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    card = relationship("Card", back_populates="comments")
 
 
 class Activity(Base):
@@ -74,17 +77,3 @@ class Activity(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
     board = relationship("Board", back_populates="activities")
-
-
-class Label(Base):
-    __tablename__ = "labels"
-    __table_args__ = (UniqueConstraint("board_id", "name", name="uq_label_board_name"),)
-
-    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    board_id = Column(Uuid(as_uuid=True), ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True)
-    name = Column(String(100), nullable=False)
-    color = Column(String(20), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    board = relationship("Board", back_populates="labels")
-    cards = relationship("Card", secondary="card_labels", back_populates="labels")
