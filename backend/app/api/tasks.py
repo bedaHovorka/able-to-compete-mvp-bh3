@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import TaskService, CommentService, DeleteResult
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
 import uuid
@@ -106,7 +106,7 @@ class ActivityResponse(BaseModel):
 
 
 class CommentCreate(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=10000)
 
 
 class CommentResponse(BaseModel):
