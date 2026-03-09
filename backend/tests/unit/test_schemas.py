@@ -159,6 +159,7 @@ class TestCardSchemas:
             "description": "Test description",
             "position": 0,
             "completed": False,
+            "priority": "medium",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -177,6 +178,7 @@ class TestCardSchemas:
             "description": None,
             "position": 0,
             "completed": True,
+            "priority": "medium",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
