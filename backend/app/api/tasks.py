@@ -4,7 +4,7 @@ from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import TaskService, CommentService, DeleteResult
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 import uuid
 
@@ -55,6 +55,20 @@ class CardMove(BaseModel):
     position: int
 
 
+class LabelCreate(BaseModel):
+    name: str = Field(..., max_length=100)
+    color: str = Field(..., pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class LabelResponse(BaseModel):
+    id: uuid.UUID
+    board_id: uuid.UUID
+    name: str
+    color: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CardResponse(BaseModel):
     id: uuid.UUID
     list_id: uuid.UUID
@@ -64,6 +78,7 @@ class CardResponse(BaseModel):
     completed: bool
     created_at: datetime
     updated_at: datetime
+    labels: List[LabelResponse] = []
 
     class Config:
         from_attributes = True
@@ -289,6 +304,94 @@ async def get_board_activity(
     """Get activity log for board"""
     activities = await TaskService.get_board_activity(db, board_id, limit=limit)
     return activities
+
+
+# Label endpoints
+@router.post("/boards/{board_id}/labels", response_model=LabelResponse, status_code=status.HTTP_201_CREATED)
+async def create_label(
+    board_id: uuid.UUID,
+    label_data: LabelCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Create a new label for a board"""
+    label = await TaskService.create_label(db, board_id, name=label_data.name, color=label_data.color)
+    if not label:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Board not found"
+        )
+    return label
+
+
+@router.get("/boards/{board_id}/labels", response_model=List[LabelResponse])
+async def list_labels(
+    board_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """List all labels for a board"""
+    labels = await TaskService.get_labels_for_board(db, board_id)
+    return labels
+
+
+@router.delete("/boards/{board_id}/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_label(
+    board_id: uuid.UUID,
+    label_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Delete a label from a board"""
+    success = await TaskService.delete_label(db, label_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Label not found"
+        )
+
+
+@router.post("/cards/{card_id}/labels/{label_id}", response_model=CardResponse)
+async def attach_label_to_card(
+    card_id: uuid.UUID,
+    label_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Attach a label to a card"""
+    result = await TaskService.add_label_to_card(db, card_id, label_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card or label not found"
+        )
+    if result == "cross_board":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Label does not belong to the same board as the card"
+        )
+    if result == "duplicate":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Label is already attached to this card"
+        )
+    return result
+
+
+@router.delete("/cards/{card_id}/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_label_from_card(
+    card_id: uuid.UUID,
+    label_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Remove a label from a card"""
+    success = await TaskService.remove_label_from_card(db, card_id, label_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card or label association not found"
+        )
 
 
 # Comment endpoints
