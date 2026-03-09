@@ -18,6 +18,7 @@ class MonitorType(str, enum.Enum):
     HTTPS = "https"
     TCP = "tcp"
     PING = "ping"
+    SSL = "ssl"
 
 
 class Monitor(Base):
@@ -54,6 +55,7 @@ class Check(Base):
     response_time = Column(Float, nullable=True)  # milliseconds
     status_code = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
+    ssl_expiry_days = Column(Integer, nullable=True)  # populated for SSL monitor checks
     checked_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     monitor = relationship("Monitor", back_populates="checks")

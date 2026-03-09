@@ -5,7 +5,7 @@ from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import MonitorService
 from app.agents import MonitorAgent
-from app.models import Check, MonitorStatus
+from app.models import Check, MonitorStatus, MonitorType
 from pydantic import AnyUrl, BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
@@ -38,6 +38,7 @@ class MonitorResponse(BaseModel):
     enabled: bool
     created_at: datetime
     last_checked_at: Optional[datetime]
+    ssl_expiry_days: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -71,6 +72,38 @@ class DashboardMetrics(BaseModel):
     avg_uptime: float
 
 
+async def _get_ssl_expiry_days(db: AsyncSession, monitor_id: uuid.UUID) -> Optional[int]:
+    """Return ssl_expiry_days from the latest check for an SSL monitor, or None."""
+    query = (
+        select(Check.ssl_expiry_days)
+        .where(Check.monitor_id == monitor_id)
+        .order_by(Check.checked_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(query)
+    row = result.scalar_one_or_none()
+    return row
+
+
+async def _build_monitor_response(db: AsyncSession, monitor) -> MonitorResponse:
+    """Build a MonitorResponse, populating ssl_expiry_days for SSL monitors."""
+    ssl_expiry_days = None
+    if monitor.type == MonitorType.SSL:
+        ssl_expiry_days = await _get_ssl_expiry_days(db, monitor.id)
+    return MonitorResponse(
+        id=monitor.id,
+        name=monitor.name,
+        url=monitor.url,
+        interval=monitor.interval,
+        type=monitor.type,
+        status=monitor.status,
+        enabled=monitor.enabled,
+        created_at=monitor.created_at,
+        last_checked_at=monitor.last_checked_at,
+        ssl_expiry_days=ssl_expiry_days,
+    )
+
+
 # Monitor endpoints
 @router.post("/monitors", response_model=MonitorResponse, status_code=status.HTTP_201_CREATED)
 async def create_monitor(
@@ -88,7 +121,7 @@ async def create_monitor(
         timeout=monitor_data.timeout,
         expected_status_code=monitor_data.expected_status_code,
     )
-    return monitor
+    return await _build_monitor_response(db, monitor)
 
 
 @router.get("/monitors", response_model=List[MonitorResponse])
@@ -100,7 +133,7 @@ async def list_monitors(
 ):
     """List all monitors"""
     monitors = await monitor_service.get_monitors(db, skip=skip, limit=limit)
-    return monitors
+    return [await _build_monitor_response(db, m) for m in monitors]
 
 
 @router.get("/monitors/{monitor_id}", response_model=MonitorResponse)
@@ -113,7 +146,7 @@ async def get_monitor(
     monitor = await monitor_service.get_monitor(db, monitor_id)
     if not monitor:
         raise HTTPException(status_code=404, detail="Monitor not found")
-    return monitor
+    return await _build_monitor_response(db, monitor)
 
 
 @router.get("/monitors/{monitor_id}/uptime", response_model=UptimeResponse)
