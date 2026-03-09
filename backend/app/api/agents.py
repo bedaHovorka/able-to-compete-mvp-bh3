@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+"""Agents API router — exposes SpecAgent, TestAgent, and DevAgent over HTTP."""
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Literal
 from app.utils.auth import get_current_active_user
@@ -21,24 +23,54 @@ class TestRequest(BaseModel):
 
 class DevRequest(BaseModel):
     specification: str
-    type: Literal["api", "service", "general"] = "general"
+    type: Literal["api", "service", "general", "model", "util"] = "general"
+
+
+# --- Response models ---
+
+class SpecResponse(BaseModel):
+    specification: str
+    type: str
+    requirements: str
+
+
+class TestResponse(BaseModel):
+    test_code: str
+    test_type: str
+    specification: str
+
+
+class DevResponse(BaseModel):
+    code: str
+    code_type: str
+    specification: str
+    language: str
 
 
 # --- Endpoints ---
 
-@router.post("/spec", dependencies=[Depends(get_current_active_user)])
+@router.post("/spec", dependencies=[Depends(get_current_active_user)], response_model=SpecResponse)
 async def generate_spec(body: SpecRequest):
     agent = SpecAgent()
-    return await agent.process(body.model_dump())
+    try:
+        return await agent.process(body.model_dump())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Agent processing failed") from exc
 
 
-@router.post("/test", dependencies=[Depends(get_current_active_user)])
+@router.post("/test", dependencies=[Depends(get_current_active_user)], response_model=TestResponse)
 async def generate_test(body: TestRequest):
     agent = TestAgent()
-    return await agent.process(body.model_dump())
+    try:
+        return await agent.process(body.model_dump())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Agent processing failed") from exc
 
 
-@router.post("/dev", dependencies=[Depends(get_current_active_user)])
+@router.post("/dev", dependencies=[Depends(get_current_active_user)], response_model=DevResponse)
 async def generate_dev(body: DevRequest):
     agent = DevAgent()
-    return await agent.process(body.model_dump())
+    try:
+        return await agent.process(body.model_dump())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Agent processing failed") from exc
