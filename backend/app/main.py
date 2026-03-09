@@ -6,7 +6,7 @@ from app.utils.logger import logger
 from app.utils.middleware import AuditMiddleware, RateLimitMiddleware
 from app.utils.database import engine, Base
 from app.utils.auth import get_current_active_user
-from app.api import auth, tasks, monitoring, websocket
+from app.api import agents, auth, tasks, monitoring, websocket
 from contextlib import asynccontextmanager
 
 
@@ -62,6 +62,7 @@ app.add_middleware(AuditMiddleware)
 app.add_middleware(RateLimitMiddleware, max_requests=100, window=60)
 
 # Include routers
+app.include_router(agents.router)
 app.include_router(auth.router)
 app.include_router(tasks.router)
 app.include_router(monitoring.router)
