@@ -2,12 +2,41 @@
 Unit tests for Task API endpoints
 """
 import pytest
-from httpx import AsyncClient
+from contextlib import asynccontextmanager
+from unittest.mock import patch
+from httpx import AsyncClient, ASGITransport
 from fastapi import status
 from app.main import app
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.task_service import TaskService
 import uuid
+
+
+@asynccontextmanager
+async def _noop_lifespan(app):
+    """Replace real lifespan so tests don't connect to PostgreSQL."""
+    yield
+
+
+@pytest.fixture(autouse=True)
+def patch_app_for_testing():
+    """Patch lifespan and AuditMiddleware to avoid real PostgreSQL connections."""
+    from app.utils.middleware import AuditMiddleware
+
+    original_lifespan = app.router.lifespan_context
+    app.router.lifespan_context = _noop_lifespan
+
+    # Bypass AuditMiddleware.dispatch: its AsyncSessionLocal() call attempts a
+    # real PostgreSQL connection (no server in unit tests), causing POST/PUT/PATCH
+    # requests to hang while waiting for the DB connection to time out.
+    async def _passthrough_dispatch(self, request, call_next):
+        return await call_next(request)
+
+    try:
+        with patch.object(AuditMiddleware, "dispatch", _passthrough_dispatch):
+            yield
+    finally:
+        app.router.lifespan_context = original_lifespan
 
 
 # Mock authentication for testing
@@ -28,7 +57,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/api/boards",
                 json={
@@ -54,7 +83,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/api/boards",
                 json={"name": "Simple Board"}
@@ -74,7 +103,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/boards")
 
         assert response.status_code == status.HTTP_200_OK
@@ -92,7 +121,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(f"/api/boards/{sample_board.id}")
 
         assert response.status_code == status.HTTP_200_OK
@@ -117,7 +146,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(f"/api/boards/{sample_board.id}")
 
         assert response.status_code == status.HTTP_200_OK
@@ -138,7 +167,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(f"/api/boards/{fake_id}")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -153,7 +182,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.put(
                 f"/api/boards/{sample_board.id}",
                 json={
@@ -177,7 +206,7 @@ class TestBoardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.delete(f"/api/boards/{sample_board.id}")
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -197,7 +226,7 @@ class TestListAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 f"/api/boards/{sample_board.id}/lists",
                 json={"name": "To Do", "position": 0}
@@ -221,7 +250,7 @@ class TestListAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 f"/api/boards/{fake_board_id}/lists",
                 json={"name": "Should Fail", "position": 0}
@@ -244,7 +273,7 @@ class TestCardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 f"/api/lists/{sample_list.id}/cards",
                 json={
@@ -272,7 +301,7 @@ class TestCardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 f"/api/lists/{fake_list_id}/cards",
                 json={"title": "Should Fail", "position": 0}
@@ -293,7 +322,7 @@ class TestCardAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.put(
                 f"/api/cards/{sample_card.id}/move",
                 json={
@@ -324,7 +353,7 @@ class TestActivityAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(f"/api/boards/{sample_board.id}/activity")
 
         assert response.status_code == status.HTTP_200_OK
@@ -343,7 +372,7 @@ class TestActivityAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
 
-        async with AsyncClient(app=app, base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(
                 f"/api/boards/{sample_board.id}/activity?limit=5"
             )
