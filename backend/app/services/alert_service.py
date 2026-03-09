@@ -50,28 +50,36 @@ class AlertService:
         logger.info(f"  Description: {incident.description}")
 
     async def _send_webhook_alert(self, incident: Incident, monitor: Monitor):
-        """Send webhook alert"""
-        webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"  # Configure in production
+        """POST webhook alert to configured URL (Slack-compatible format)"""
+        webhook_url = settings.WEBHOOK_URL
+        if not webhook_url:
+            logger.info(f"[WEBHOOK] WEBHOOK_URL not configured — skipping incident {incident.id}")
+            return
 
         payload = {
             "text": f"INCIDENT: {incident.title}",
+            "username": "AbleToCompete Alerts",
             "attachments": [
                 {
-                    "color": "danger" if incident.severity == "critical" else "warning",
+                    "color": "danger" if incident.severity.value == "critical" else "warning",
                     "fields": [
                         {"title": "Monitor", "value": monitor.name, "short": True},
                         {"title": "URL", "value": monitor.url, "short": True},
                         {"title": "Severity", "value": incident.severity.value, "short": True},
                         {"title": "Status", "value": incident.status.value, "short": True},
-                        {"title": "Description", "value": incident.description}
+                        {"title": "Description", "value": incident.description},
                     ],
                     "footer": "AbleToCompete Monitoring",
-                    "ts": int(incident.started_at.timestamp())
+                    "ts": int(incident.started_at.timestamp()),
                 }
-            ]
+            ],
         }
 
-        logger.info(f"[WEBHOOK] Alert sent for incident {incident.id}")
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(webhook_url, json=payload, timeout=5.0)
+            resp.raise_for_status()
+
+        logger.info(f"[WEBHOOK] Posted alert for incident {incident.id} — HTTP {resp.status_code}")
 
     async def _send_sms_alert(self, incident: Incident, monitor: Monitor):
         """Simulate sending SMS alert"""
