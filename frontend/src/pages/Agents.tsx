@@ -39,7 +39,8 @@ export default function Agents() {
       setSpecification(spec)
       setTestSpec(spec)
       setDevSpec(spec)
-    } catch {
+    } catch (err) {
+      console.error('Spec agent error:', err)
       setSpecError('Failed to generate specification. Please try again.')
     } finally {
       setSpecLoading(false)
@@ -53,7 +54,8 @@ export default function Agents() {
     try {
       const res = await agents.test({ specification: testSpec.trim(), type: testType })
       setTestCode(res.data.test_code)
-    } catch {
+    } catch (err) {
+      console.error('Test agent error:', err)
       setTestError('Failed to generate tests. Please try again.')
     } finally {
       setTestLoading(false)
@@ -67,7 +69,8 @@ export default function Agents() {
     try {
       const res = await agents.dev({ specification: devSpec.trim(), type: devType })
       setDevCode(res.data.code)
-    } catch {
+    } catch (err) {
+      console.error('Dev agent error:', err)
       setDevError('Failed to generate code. Please try again.')
     } finally {
       setDevLoading(false)
