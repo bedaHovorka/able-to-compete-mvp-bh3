@@ -57,3 +57,22 @@ export interface ActivityEntry {
   details: string
   timestamp: string
 }
+
+export interface Incident {
+  id: string
+  monitor_id: string
+  title: string
+  description?: string
+  status: 'investigating' | 'identified' | 'monitoring' | 'resolved'
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  started_at: string
+  resolved_at?: string
+  acknowledged_at?: string
+}
+
+export interface AnalysisResult {
+  analysis: string
+  analysis_type: string
+  incident_id: string
+  confidence: number
+}

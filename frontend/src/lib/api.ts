@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
-import type { Board, List, Card, Monitor, StatusData, ActivityEntry } from '../types'
+import type { Board, List, Card, Monitor, StatusData, ActivityEntry, Incident, AnalysisResult } from '../types'
 
 const api = axios.create({
   baseURL: '/api',

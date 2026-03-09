@@ -301,6 +301,25 @@ async def get_dashboard_metrics(
     )
 
 
+# Incidents endpoints
+@router.get("/incidents", response_model=List[IncidentResponse])
+async def list_incidents(
+    monitor_id: Optional[uuid.UUID] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """List incidents, optionally filtered by monitor"""
+    from app.models import Incident
+    query = select(Incident)
+    if monitor_id:
+        query = query.where(Incident.monitor_id == monitor_id)
+    query = query.order_by(Incident.started_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
 # AI-powered analysis
 @router.post("/ai/analyze-incident")
 async def analyze_incident(
