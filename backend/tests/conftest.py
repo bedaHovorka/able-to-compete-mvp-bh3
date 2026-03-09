@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.pool import StaticPool
 from app.utils.database import Base
 from app.models import Board, List, Card
+from app.models.monitor import Monitor, Incident, MonitorType, IncidentSeverity
 import uuid
 
 # Test database URL (using SQLite for testing)
@@ -97,3 +98,27 @@ async def sample_card(db_session: AsyncSession, sample_list: List) -> Card:
     await db_session.commit()
     await db_session.refresh(card)
     return card
+
+
+@pytest_asyncio.fixture
+async def sample_monitor(db_session: AsyncSession) -> Monitor:
+    """Create a sample monitor for testing"""
+    monitor = Monitor(name="Test Monitor", url="https://example.com", type=MonitorType.HTTPS)
+    db_session.add(monitor)
+    await db_session.commit()
+    await db_session.refresh(monitor)
+    return monitor
+
+
+@pytest_asyncio.fixture
+async def sample_incident(db_session: AsyncSession, sample_monitor: Monitor) -> Incident:
+    """Create a sample incident for testing"""
+    incident = Incident(
+        monitor_id=sample_monitor.id,
+        title="Test monitor is down",
+        severity=IncidentSeverity.CRITICAL,
+    )
+    db_session.add(incident)
+    await db_session.commit()
+    await db_session.refresh(incident)
+    return incident

@@ -113,7 +113,7 @@ class MonitorAgent(BaseAgent):
         incidents to identify root causes, suggest solutions, and provide actionable
         runbooks. Use historical data to detect patterns."""
 
-        prompt = f"""Analyze this incident and provide {analysis_type} analysis:
+        prompt = f"""Analyze this incident and provide {analysis_type.replace('_', ' ')} analysis:
 
         Incident: {incident_data.get('title', 'Unknown')}
         Description: {incident_data.get('description', 'No description')}
