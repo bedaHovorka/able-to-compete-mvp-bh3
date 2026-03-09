@@ -68,7 +68,7 @@ async def create_monitor(
     monitor = await monitor_service.create_monitor(
         db,
         name=monitor_data.name,
-        url=monitor_data.url,
+        url=str(monitor_data.url),
         interval=monitor_data.interval,
         monitor_type=monitor_data.type
     )
