@@ -9,7 +9,6 @@ class BaseAgent(ABC):
 
     def __init__(self, model: str = None):
         self.model = model or settings.LLM_MODEL
-        self.api_key = None  # Configure based on provider
         self.conversation_history: List[Dict[str, str]] = []
 
     def add_to_history(self, role: str, content: str):
@@ -22,20 +21,33 @@ class BaseAgent(ABC):
 
     async def call_llm(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """
-        Call LLM API (simplified for MVP - supports OpenAI-compatible APIs)
-        In production, integrate with actual LLM provider
+        Call LLM API via Anthropic. Falls back to simulate_response when the
+        API key is absent or the request fails.
         """
-        messages = []
+        if not settings.ANTHROPIC_API_KEY:
+            logger.warning("ANTHROPIC_API_KEY not set — using simulated response")
+            return self.simulate_response(prompt)
 
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-        messages.extend(self.conversation_history)
-        messages.append({"role": "user", "content": prompt})
+            messages = list(self.conversation_history)
+            messages.append({"role": "user", "content": prompt})
 
-        # Simulated response for MVP
-        logger.info(f"AI Agent called with prompt: {prompt[:100]}...")
-        return self.simulate_response(prompt)
+            response = await client.messages.create(
+                model=self.model,
+                max_tokens=1024,
+                system=system_prompt or "You are a helpful AI assistant.",
+                messages=messages,
+            )
+            result = response.content[0].text
+            self.add_to_history("user", prompt)
+            self.add_to_history("assistant", result)
+            return result
+        except Exception as e:
+            logger.error(f"LLM call failed: {e} — falling back to simulated response")
+            return self.simulate_response(prompt)
 
     @abstractmethod
     def simulate_response(self, prompt: str) -> str:
