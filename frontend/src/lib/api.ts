@@ -62,6 +62,11 @@ export const cards = {
     api.put<Card>(`/cards/${cardId}/move`, data),
 }
 
+export interface CheckResponse {
+  status: string
+  check_id: string
+}
+
 export const monitors = {
   list: () => api.get<Monitor[]>('/monitors'),
   get: (id: string) => api.get<Monitor>(`/monitors/${id}`),
@@ -69,7 +74,7 @@ export const monitors = {
     api.post<Monitor>('/monitors', data),
   uptime: (id: string, hours: number = 24) =>
     api.get<{ uptime: number }>(`/monitors/${id}/uptime`, { params: { hours } }),
-  check: (id: string) => api.post<Monitor>(`/monitors/${id}/check`),
+  check: (id: string) => api.post<CheckResponse>(`/monitors/${id}/check`),
 }
 
 export const dashboard = {
