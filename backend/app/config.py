@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     ENABLE_AI_AGENTS: bool = True
     LLM_MODEL: str = "claude-sonnet-4-6"
     ANTHROPIC_API_KEY: Optional[str] = None
+    MAX_TOKENS: int = 1024
 
     # Alerts
     WEBHOOK_URL: str = ""

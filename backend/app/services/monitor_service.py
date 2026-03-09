@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-from app.models import Monitor, Check, Incident, Metric, MonitorStatus, IncidentStatus, IncidentSeverity
+from sqlalchemy import select, and_
+from app.models import Monitor, Check, Incident, MonitorStatus, IncidentStatus, IncidentSeverity
 from app.utils.logger import logger
 from app.utils.database import AsyncSessionLocal
 from typing import Optional, List as ListType, Dict

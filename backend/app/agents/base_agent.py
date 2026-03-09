@@ -19,7 +19,7 @@ class BaseAgent(ABC):
         """Clear conversation history"""
         self.conversation_history = []
 
-    async def call_llm(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+    async def call_llm(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 1024) -> str:
         """
         Call LLM API via Anthropic. Falls back to simulate_response when the
         API key is absent or the request fails.
@@ -37,7 +37,7 @@ class BaseAgent(ABC):
 
             response = await client.messages.create(
                 model=self.model,
-                max_tokens=1024,
+                max_tokens=max_tokens,
                 system=system_prompt or "You are a helpful AI assistant.",
                 messages=messages,
             )

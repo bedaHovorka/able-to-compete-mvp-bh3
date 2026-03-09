@@ -18,6 +18,26 @@ class ConcreteAgent(BaseAgent):
         return {}
 
 
+@pytest.fixture
+def make_mock_client():
+    """Factory fixture: returns a (mock_anthropic_module, mock_client) pair.
+
+    The mock_client's messages.create is an AsyncMock that returns a response
+    whose first content block has the given text.
+    """
+    def _factory(response_text="real response"):
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text=response_text)]
+        mock_client = AsyncMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
+        mock_anthropic_module = MagicMock()
+        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
+        return mock_anthropic_module, mock_client
+
+    return _factory
+
+
 @pytest.mark.asyncio
 class TestCallLlmNoApiKey:
     """call_llm falls back to simulate_response when ANTHROPIC_API_KEY is absent."""
@@ -57,23 +77,9 @@ class TestCallLlmNoApiKey:
 class TestCallLlmWithApiKey:
     """call_llm makes a real Anthropic request when ANTHROPIC_API_KEY is set."""
 
-    def _make_mock_response(self, text: str):
-        content_block = MagicMock()
-        content_block.text = text
-        response = MagicMock()
-        response.content = [content_block]
-        return response
-
-    async def test_returns_llm_response_when_key_set(self):
+    async def test_returns_llm_response_when_key_set(self, make_mock_client):
         agent = ConcreteAgent()
-        mock_response = self._make_mock_response("LLM answer")
-
-        mock_client = AsyncMock()
-        mock_client.messages.create = AsyncMock(return_value=mock_response)
-
-        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
-        mock_anthropic_module = MagicMock()
-        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
+        mock_anthropic_module, mock_client = make_mock_client("LLM answer")
 
         with patch("app.agents.base_agent.settings") as mock_settings, \
              patch.dict("sys.modules", {"anthropic": mock_anthropic_module}):
@@ -84,16 +90,9 @@ class TestCallLlmWithApiKey:
 
         assert result == "LLM answer"
 
-    async def test_conversation_history_updated_after_successful_call(self):
+    async def test_conversation_history_updated_after_successful_call(self, make_mock_client):
         agent = ConcreteAgent()
-        mock_response = self._make_mock_response("42")
-
-        mock_client = AsyncMock()
-        mock_client.messages.create = AsyncMock(return_value=mock_response)
-
-        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
-        mock_anthropic_module = MagicMock()
-        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
+        mock_anthropic_module, mock_client = make_mock_client("42")
 
         with patch("app.agents.base_agent.settings") as mock_settings, \
              patch.dict("sys.modules", {"anthropic": mock_anthropic_module}):
@@ -105,16 +104,9 @@ class TestCallLlmWithApiKey:
         assert {"role": "user", "content": "What is 6x7?"} in agent.conversation_history
         assert {"role": "assistant", "content": "42"} in agent.conversation_history
 
-    async def test_system_prompt_passed_to_api(self):
+    async def test_system_prompt_passed_to_api(self, make_mock_client):
         agent = ConcreteAgent()
-        mock_response = self._make_mock_response("ok")
-
-        mock_client = AsyncMock()
-        mock_client.messages.create = AsyncMock(return_value=mock_response)
-
-        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
-        mock_anthropic_module = MagicMock()
-        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
+        mock_anthropic_module, mock_client = make_mock_client("ok")
 
         with patch("app.agents.base_agent.settings") as mock_settings, \
              patch.dict("sys.modules", {"anthropic": mock_anthropic_module}):
@@ -126,16 +118,9 @@ class TestCallLlmWithApiKey:
         call_kwargs = mock_client.messages.create.call_args.kwargs
         assert call_kwargs["system"] == "Be concise."
 
-    async def test_default_system_prompt_used_when_none_given(self):
+    async def test_default_system_prompt_used_when_none_given(self, make_mock_client):
         agent = ConcreteAgent()
-        mock_response = self._make_mock_response("ok")
-
-        mock_client = AsyncMock()
-        mock_client.messages.create = AsyncMock(return_value=mock_response)
-
-        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
-        mock_anthropic_module = MagicMock()
-        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
+        mock_anthropic_module, mock_client = make_mock_client("ok")
 
         with patch("app.agents.base_agent.settings") as mock_settings, \
              patch.dict("sys.modules", {"anthropic": mock_anthropic_module}):
@@ -147,15 +132,10 @@ class TestCallLlmWithApiKey:
         call_kwargs = mock_client.messages.create.call_args.kwargs
         assert call_kwargs["system"] == "You are a helpful AI assistant."
 
-    async def test_falls_back_to_simulate_on_api_exception(self):
+    async def test_falls_back_to_simulate_on_api_exception(self, make_mock_client):
         agent = ConcreteAgent()
-
-        mock_client = AsyncMock()
+        mock_anthropic_module, mock_client = make_mock_client()
         mock_client.messages.create = AsyncMock(side_effect=RuntimeError("network error"))
-
-        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
-        mock_anthropic_module = MagicMock()
-        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
 
         with patch("app.agents.base_agent.settings") as mock_settings, \
              patch.dict("sys.modules", {"anthropic": mock_anthropic_module}):
@@ -171,19 +151,9 @@ class TestCallLlmWithApiKey:
 class TestCallLlmApiParameters:
     """Verify exact parameters passed to the Anthropic API call."""
 
-    def _make_mock_client(self, response_text="real response"):
-        mock_response = MagicMock()
-        mock_response.content = [MagicMock(text=response_text)]
-        mock_client = AsyncMock()
-        mock_client.messages.create = AsyncMock(return_value=mock_response)
-        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
-        mock_anthropic_module = MagicMock()
-        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
-        return mock_anthropic_module, mock_client
-
-    async def test_max_tokens_is_1024(self):
+    async def test_max_tokens_is_1024(self, make_mock_client):
         """API call must use max_tokens=1024."""
-        mock_anthropic_module, mock_client = self._make_mock_client()
+        mock_anthropic_module, mock_client = make_mock_client()
         agent = ConcreteAgent()
 
         with patch("app.agents.base_agent.settings") as mock_settings, \
@@ -195,9 +165,9 @@ class TestCallLlmApiParameters:
         call_kwargs = mock_client.messages.create.call_args.kwargs
         assert call_kwargs["max_tokens"] == 1024
 
-    async def test_model_from_settings_used(self):
+    async def test_model_from_settings_used(self, make_mock_client):
         """API call must use self.model (from settings.LLM_MODEL at agent creation)."""
-        mock_anthropic_module, mock_client = self._make_mock_client()
+        mock_anthropic_module, mock_client = make_mock_client()
 
         with patch("app.agents.base_agent.settings") as mock_settings, \
              patch.dict("sys.modules", {"anthropic": mock_anthropic_module}):
@@ -209,9 +179,9 @@ class TestCallLlmApiParameters:
         call_kwargs = mock_client.messages.create.call_args.kwargs
         assert call_kwargs["model"] == "claude-opus-4-6"
 
-    async def test_conversation_history_included_in_messages(self):
+    async def test_conversation_history_included_in_messages(self, make_mock_client):
         """Existing conversation history must be included in the messages sent to API."""
-        mock_anthropic_module, mock_client = self._make_mock_client()
+        mock_anthropic_module, mock_client = make_mock_client()
         agent = ConcreteAgent()
         agent.add_to_history("user", "previous question")
         agent.add_to_history("assistant", "previous answer")
@@ -228,13 +198,10 @@ class TestCallLlmApiParameters:
         assert any(m["content"] == "previous answer" for m in messages)
         assert messages[-1]["content"] == "new question"
 
-    async def test_history_not_updated_on_exception(self):
+    async def test_history_not_updated_on_exception(self, make_mock_client):
         """Conversation history must NOT be updated when API call fails."""
-        mock_client = AsyncMock()
+        mock_anthropic_module, mock_client = make_mock_client()
         mock_client.messages.create = AsyncMock(side_effect=RuntimeError("API down"))
-        mock_async_anthropic_cls = MagicMock(return_value=mock_client)
-        mock_anthropic_module = MagicMock()
-        mock_anthropic_module.AsyncAnthropic = mock_async_anthropic_cls
 
         agent = ConcreteAgent()
         history_before = len(agent.conversation_history)

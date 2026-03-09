@@ -5,7 +5,6 @@ from app.utils.logger import logger
 from typing import Optional, Dict, Any, List as ListType
 from datetime import datetime, timedelta
 import uuid
-import json
 
 
 class AuditLog(Base):

@@ -189,7 +189,7 @@ async def get_dashboard_metrics(
 ):
     """Get dashboard metrics"""
     from sqlalchemy import select, func
-    from app.models import Monitor, Incident, MonitorStatus, IncidentStatus
+    from app.models import Incident, MonitorStatus, IncidentStatus
 
     # Count monitors by status
     monitors = await monitor_service.get_monitors(db)

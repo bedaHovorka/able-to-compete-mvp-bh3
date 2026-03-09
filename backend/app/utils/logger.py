@@ -1,6 +1,5 @@
 import logging
 import sys
-from datetime import datetime
 from app.config import settings
 
 # Configure logging
