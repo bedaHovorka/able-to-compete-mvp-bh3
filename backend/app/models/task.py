@@ -59,6 +59,20 @@ class Card(Base):
 
     list = relationship("List", back_populates="cards")
     labels = relationship("Label", secondary="card_labels", back_populates="cards")
+    comments = relationship("Comment", back_populates="card", cascade="all, delete-orphan")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    card_id = Column(Uuid(as_uuid=True), ForeignKey("cards.id"), nullable=False, index=True)
+    user_id = Column(Uuid(as_uuid=True), nullable=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    card = relationship("Card", back_populates="comments")
 
 
 class Activity(Base):

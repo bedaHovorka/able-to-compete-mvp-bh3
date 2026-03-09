@@ -1,12 +1,19 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_, delete, func
 from sqlalchemy.orm import selectinload
-from app.models import Board, List, Card, Activity, Label
+from app.models import Board, List, Card, Activity, Label, Comment
 from app.models.task import card_labels
 from app.utils.logger import logger
 from typing import Optional, List as ListType, Union
 from datetime import datetime
+import enum
 import uuid
+
+
+class DeleteResult(enum.Enum):
+    OK = "ok"
+    NOT_FOUND = "not_found"
+    FORBIDDEN = "forbidden"
 
 
 class TaskService:
@@ -84,8 +91,12 @@ class TaskService:
         lists_result = await db.execute(select(List.id).where(List.board_id == board_id))
         list_ids = lists_result.scalars().all()
 
-        # Bulk hard-delete all Cards and Lists (neither has deleted_at)
+        # Bulk hard-delete all Cards, Comments, and Lists (neither has deleted_at)
         if list_ids:
+            card_ids_result = await db.execute(select(Card.id).where(Card.list_id.in_(list_ids)))
+            card_ids = card_ids_result.scalars().all()
+            if card_ids:
+                await db.execute(delete(Comment).where(Comment.card_id.in_(card_ids)))
             await db.execute(delete(Card).where(Card.list_id.in_(list_ids)))
             await db.execute(delete(List).where(List.board_id == board_id))
 
@@ -270,3 +281,87 @@ class TaskService:
         await db.commit()
         logger.info(f"Removed label {label_id} from card {card_id}")
         return True
+
+
+class CommentService:
+    @staticmethod
+    async def create_comment(
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        content: str,
+        user_id: Optional[uuid.UUID] = None,
+    ) -> Optional[Comment]:
+        """Create a comment on a card and log the activity."""
+        # Verify card exists and resolve board_id for activity
+        query = (
+            select(Card)
+            .where(Card.id == card_id)
+            .options(selectinload(Card.list))
+        )
+        result = await db.execute(query)
+        card = result.scalar_one_or_none()
+        if not card:
+            return None
+
+        comment = Comment(card_id=card_id, content=content, user_id=user_id)
+        db.add(comment)
+        await db.flush()
+
+        activity = Activity(
+            board_id=card.list.board_id,
+            user_id=user_id,
+            action="create",
+            entity_type="comment",
+            entity_id=comment.id,
+            details=f"Added comment on card: {card.title}",
+        )
+        db.add(activity)
+        await db.commit()
+        await db.refresh(comment)
+
+        logger.info(f"Created comment: {comment.id} on card {card_id}")
+        return comment
+
+    @staticmethod
+    async def get_comments_for_card(
+        db: AsyncSession,
+        card_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> tuple[ListType[Comment], int]:
+        """Return paginated comments for a card and the total count."""
+        count_result = await db.execute(
+            select(func.count()).select_from(Comment).where(Comment.card_id == card_id)
+        )
+        total = count_result.scalar_one()
+
+        comments_result = await db.execute(
+            select(Comment)
+            .where(Comment.card_id == card_id)
+            .order_by(Comment.created_at.asc())
+            .offset(skip)
+            .limit(limit)
+        )
+        comments = comments_result.scalars().all()
+        return comments, total
+
+    @staticmethod
+    async def delete_comment(
+        db: AsyncSession,
+        comment_id: uuid.UUID,
+        user_id: Optional[uuid.UUID] = None,
+    ) -> DeleteResult:
+        """Delete a comment. Returns a DeleteResult indicating outcome."""
+        result = await db.execute(select(Comment).where(Comment.id == comment_id))
+        comment = result.scalar_one_or_none()
+
+        if not comment:
+            return DeleteResult.NOT_FOUND
+
+        if comment.user_id is not None and comment.user_id != user_id:
+            return DeleteResult.FORBIDDEN
+
+        await db.delete(comment)
+        await db.commit()
+        logger.info(f"Deleted comment: {comment_id}")
+        return DeleteResult.OK

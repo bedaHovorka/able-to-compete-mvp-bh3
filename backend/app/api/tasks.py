@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
-from app.services import TaskService
-from pydantic import BaseModel, Field, ConfigDict
+from app.services import TaskService, CommentService, DeleteResult
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
 import uuid
@@ -118,6 +118,28 @@ class ActivityResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=10000)
+
+
+class CommentResponse(BaseModel):
+    id: uuid.UUID
+    card_id: uuid.UUID
+    user_id: Optional[uuid.UUID]
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CommentListResponse(BaseModel):
+    comments: List[CommentResponse]
+    total: int
+    skip: int
+    limit: int
 
 
 # Board endpoints
@@ -370,3 +392,57 @@ async def remove_label_from_card(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Card or label association not found"
         )
+
+
+# Comment endpoints
+@router.post("/cards/{card_id}/comments", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
+async def create_comment(
+    card_id: uuid.UUID,
+    comment_data: CommentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Create a comment on a card"""
+    user_id = uuid.UUID(current_user["id"]) if current_user.get("id") else None
+    comment = await CommentService.create_comment(
+        db,
+        card_id=card_id,
+        content=comment_data.content,
+        user_id=user_id,
+    )
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card not found"
+        )
+    return comment
+
+
+@router.get("/cards/{card_id}/comments", response_model=CommentListResponse)
+async def list_comments(
+    card_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """List comments on a card"""
+    comments, total = await CommentService.get_comments_for_card(
+        db, card_id=card_id, skip=skip, limit=limit
+    )
+    return CommentListResponse(comments=comments, total=total, skip=skip, limit=limit)
+
+
+@router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment(
+    comment_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Delete a comment (owner only)"""
+    user_id = uuid.UUID(current_user["id"]) if current_user.get("id") else None
+    result = await CommentService.delete_comment(db, comment_id=comment_id, user_id=user_id)
+    if result == DeleteResult.NOT_FOUND:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+    if result == DeleteResult.FORBIDDEN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to delete this comment")
