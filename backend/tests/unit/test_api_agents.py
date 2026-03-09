@@ -384,6 +384,191 @@ class TestPipelineEndpoint:
 
     async def test_invalid_order_returns_422(self):
         """run_steps in wrong canonical order returns 422."""
+        """Returns 404 when the incident_id does not exist in the database."""
+        from app.utils.auth import get_current_active_user
+        from app.utils.database import get_db
+
+        async def override_get_db():
+            from unittest.mock import AsyncMock, MagicMock
+            mock_db = AsyncMock()
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db.execute = AsyncMock(return_value=mock_result)
+            yield mock_db
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/agents/monitor",
+                    json={"incident_id": str(uuid.uuid4()), "description": "Service is down"},
+                )
+            assert response.status_code == status.HTTP_404_NOT_FOUND
+            assert response.json()["detail"] == "Incident not found"
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_valid_request_calls_monitor_agent(self):
+        """Calls MonitorAgent.process() with correct context and returns its result."""
+        from app.utils.auth import get_current_active_user
+        from app.utils.database import get_db
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from datetime import datetime
+
+        incident_id = uuid.uuid4()
+        monitor_id = uuid.uuid4()
+
+        fake_incident = MagicMock()
+        fake_incident.id = incident_id
+        fake_incident.monitor_id = monitor_id
+        fake_incident.title = "Test monitor is down"
+        fake_incident.started_at = datetime(2024, 1, 1, 12, 0, 0)
+        fake_incident.resolved_at = datetime(2024, 1, 1, 12, 15, 0)
+
+        fake_monitor = MagicMock()
+        fake_monitor.name = "Test Monitor"
+
+        mock_incident_result = MagicMock()
+        mock_incident_result.scalar_one_or_none.return_value = fake_incident
+        mock_monitor_result = MagicMock()
+        mock_monitor_result.scalar_one_or_none.return_value = fake_monitor
+
+        async def override_get_db():
+            mock_db = AsyncMock()
+            mock_db.execute.side_effect = [mock_incident_result, mock_monitor_result]
+            yield mock_db
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            fake_agent_result = {
+                "analysis": "General analysis",
+                "analysis_type": "general",
+                "incident_id": str(incident_id),
+                "confidence": 0.85,
+            }
+            with patch("app.api.agents.MonitorAgent") as MockMonitorAgent:
+                mock_instance = MockMonitorAgent.return_value
+                mock_instance.process = AsyncMock(return_value=fake_agent_result)
+
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    response = await client.post(
+                        "/api/agents/monitor",
+                        json={
+                            "incident_id": str(incident_id),
+                            "description": "Service is completely unresponsive",
+                            "analysis_type": "general",
+                        },
+                    )
+
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["incident_id"] == str(incident_id)
+            assert data["analysis_type"] == "general"
+            assert data["result"] == fake_agent_result
+            mock_instance.process.assert_awaited_once()
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_default_analysis_type_is_general(self):
+        """analysis_type defaults to 'general' when not provided."""
+        from app.utils.auth import get_current_active_user
+        from app.utils.database import get_db
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from datetime import datetime
+
+        incident_id = uuid.uuid4()
+        monitor_id = uuid.uuid4()
+
+        fake_incident = MagicMock()
+        fake_incident.id = incident_id
+        fake_incident.monitor_id = monitor_id
+        fake_incident.title = "Test monitor is down"
+        fake_incident.started_at = datetime(2024, 1, 1, 12, 0, 0)
+        fake_incident.resolved_at = None
+
+        fake_monitor = MagicMock()
+        fake_monitor.name = "Test Monitor"
+
+        mock_incident_result = MagicMock()
+        mock_incident_result.scalar_one_or_none.return_value = fake_incident
+        mock_monitor_result = MagicMock()
+        mock_monitor_result.scalar_one_or_none.return_value = fake_monitor
+
+        async def override_get_db():
+            mock_db = AsyncMock()
+            mock_db.execute.side_effect = [mock_incident_result, mock_monitor_result]
+            yield mock_db
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            fake_agent_result = {
+                "analysis": "General analysis",
+                "analysis_type": "general",
+                "incident_id": str(incident_id),
+                "confidence": 0.85,
+            }
+            with patch("app.api.agents.MonitorAgent") as MockMonitorAgent:
+                mock_instance = MockMonitorAgent.return_value
+                mock_instance.process = AsyncMock(return_value=fake_agent_result)
+
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    response = await client.post(
+                        "/api/agents/monitor",
+                        json={
+                            "incident_id": str(incident_id),
+                            "description": "Service is down",
+                        },
+                    )
+
+            assert response.status_code == status.HTTP_200_OK
+            assert response.json()["analysis_type"] == "general"
+            # Verify agent was called with type "general"
+            called_context = mock_instance.process.call_args[0][0]
+            assert called_context["type"] == "general"
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_invalid_analysis_type_returns_422(self):
+        """Returns 422 when an invalid analysis_type value is provided."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/agents/monitor",
+                    json={
+                        "incident_id": str(uuid.uuid4()),
+                        "description": "Service is down",
+                        "analysis_type": "invalid_type",
+                    },
+                )
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_missing_required_fields_returns_422(self):
+        """Returns 422 when required fields are missing."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post("/api/agents/monitor", json={})
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        finally:
+            app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+class TestPipelineEndpoint2:
+    """Tests for POST /api/agents/pipeline (pipeline-specific tests)"""
+
+    async def test_invalid_order_returns_422(self):
+        """run_steps in wrong canonical order returns 422."""
         from app.utils.auth import get_current_active_user
 
         app.dependency_overrides[get_current_active_user] = override_get_current_active_user
