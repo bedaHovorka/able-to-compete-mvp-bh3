@@ -26,10 +26,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body = await request.body()
                 if body:
                     request_body = json.loads(body.decode())
-                # Reset the request body for downstream processing
-                async def receive():
-                    return {"type": "http.request", "body": body}
-                request._receive = receive
+                # request._body is now cached by starlette; no need to patch
+                # _receive — wrapped_receive serves the body from cache automatically.
             except:
                 pass
 
