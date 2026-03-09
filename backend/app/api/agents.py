@@ -97,7 +97,6 @@ async def generate_dev(body: DevRequest):
         raise HTTPException(status_code=500, detail="Agent processing failed") from exc
 
 
-<<<<<<< HEAD
 # --- Pipeline schemas ---
 
 class PipelineRequest(BaseModel):
