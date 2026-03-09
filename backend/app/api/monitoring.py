@@ -50,6 +50,18 @@ class UptimeResponse(BaseModel):
     avg_response_time: float
 
 
+class ResponseTimePoint(BaseModel):
+    checked_at: datetime
+    response_time_ms: Optional[float]
+    status: str
+
+
+class ResponseTimeHistory(BaseModel):
+    monitor_id: uuid.UUID
+    total: int
+    data: List[ResponseTimePoint]
+
+
 class DashboardMetrics(BaseModel):
     total_monitors: int
     monitors_up: int
@@ -114,6 +126,35 @@ async def get_monitor_uptime(
     """Calculate monitor uptime percentage"""
     uptime_data = await monitor_service.calculate_uptime(db, monitor_id, hours=hours)
     return uptime_data
+
+
+@router.get("/monitors/{monitor_id}/response-times", response_model=ResponseTimeHistory)
+async def get_response_time_history(
+    monitor_id: uuid.UUID,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Get response time history for a monitor"""
+    monitor = await monitor_service.get_monitor(db, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+
+    checks, total = await monitor_service.get_response_time_history(
+        db, monitor_id, limit=limit, offset=offset
+    )
+
+    data = [
+        ResponseTimePoint(
+            checked_at=check.checked_at,
+            response_time_ms=check.response_time,
+            status=check.status.value,
+        )
+        for check in checks
+    ]
+
+    return ResponseTimeHistory(monitor_id=monitor_id, total=total, data=data)
 
 
 @router.post("/monitors/{monitor_id}/check")
