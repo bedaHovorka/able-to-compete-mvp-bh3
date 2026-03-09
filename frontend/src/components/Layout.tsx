@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Trello, Activity, LogOut, User, Bell } from 'lucide-react'
+import { LayoutDashboard, Trello, Activity, LogOut, User, Bell, Bot } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { Navbar, Container, Nav, NavDropdown } from 'react-bootstrap'
 
@@ -51,6 +51,14 @@ export default function Layout() {
               >
                 <Activity size={18} className="me-2" style={{ verticalAlign: 'sub' }} />
                 Monitoring
+              </Nav.Link>
+              <Nav.Link
+                as={Link}
+                to="/agents"
+                className={isActive('/agents') ? 'active' : ''}
+              >
+                <Bot size={18} className="me-2" style={{ verticalAlign: 'sub' }} />
+                Agents
               </Nav.Link>
             </Nav>
 

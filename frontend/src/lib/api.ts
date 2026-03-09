@@ -81,3 +81,31 @@ export const dashboard = {
   metrics: () => api.get('/metrics/dashboard'),
   statusPage: () => api.get<StatusData>('/status-page'),
 }
+
+export interface SpecResponse {
+  specification: string
+  type: string
+  requirements: string
+}
+
+export interface TestResponse {
+  test_code: string
+  test_type: string
+  specification: string
+}
+
+export interface DevResponse {
+  code: string
+  code_type: string
+  specification: string
+  language: string
+}
+
+export const agents = {
+  spec: (data: { requirements: string; type: string }) =>
+    api.post<SpecResponse>('/agents/spec', data),
+  test: (data: { specification: string; type: string }) =>
+    api.post<TestResponse>('/agents/test', data),
+  dev: (data: { specification: string; type: string }) =>
+    api.post<DevResponse>('/agents/dev', data),
+}
