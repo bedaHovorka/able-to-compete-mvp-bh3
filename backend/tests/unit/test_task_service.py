@@ -4,7 +4,7 @@ Unit tests for TaskService
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.task_service import TaskService
-from app.models import Board, List, Card, Activity
+from app.models import Board, List, Card, Activity, Label
 from app.models.task import CardPriority
 import uuid
 
@@ -500,3 +500,119 @@ class TestTaskServiceActivity:
         # Verify descending order
         for i in range(len(result) - 1):
             assert result[i].timestamp >= result[i + 1].timestamp
+
+
+@pytest.mark.asyncio
+class TestTaskServiceLabel:
+    """Tests for TaskService label operations"""
+
+    async def test_create_label(self, db_session: AsyncSession, sample_board: Board):
+        """Test creating a label"""
+        label = await TaskService.create_label(
+            db_session, sample_board.id, name="Bug", color="#FF5733"
+        )
+
+        assert label is not None
+        assert label.id is not None
+        assert label.name == "Bug"
+        assert label.color == "#FF5733"
+        assert label.board_id == sample_board.id
+
+    async def test_create_label_nonexistent_board(self, db_session: AsyncSession):
+        """Test creating a label on a board that doesn't exist"""
+        fake_board_id = uuid.uuid4()
+        label = await TaskService.create_label(
+            db_session, fake_board_id, name="Bug", color="#FF5733"
+        )
+        assert label is None
+
+    async def test_get_labels_for_board(self, db_session: AsyncSession, sample_board: Board):
+        """Test getting labels for a board"""
+        await TaskService.create_label(db_session, sample_board.id, name="Bug", color="#FF5733")
+        await TaskService.create_label(db_session, sample_board.id, name="Feature", color="#33FF57")
+
+        labels = await TaskService.get_labels_for_board(db_session, sample_board.id)
+
+        assert len(labels) == 2
+        assert all(lbl.board_id == sample_board.id for lbl in labels)
+
+    async def test_delete_label(self, db_session: AsyncSession, sample_board: Board):
+        """Test deleting a label"""
+        label = await TaskService.create_label(
+            db_session, sample_board.id, name="Bug", color="#FF5733"
+        )
+
+        result = await TaskService.delete_label(db_session, label.id)
+        assert result is True
+
+        labels = await TaskService.get_labels_for_board(db_session, sample_board.id)
+        assert len(labels) == 0
+
+    async def test_delete_nonexistent_label(self, db_session: AsyncSession):
+        """Test deleting a label that doesn't exist"""
+        result = await TaskService.delete_label(db_session, uuid.uuid4())
+        assert result is False
+
+    async def test_add_label_to_card(
+        self, db_session: AsyncSession, sample_board: Board, sample_list: List, sample_card: Card
+    ):
+        """Test adding a label to a card"""
+        label = await TaskService.create_label(
+            db_session, sample_board.id, name="Bug", color="#FF5733"
+        )
+
+        result = await TaskService.add_label_to_card(db_session, sample_card.id, label.id)
+
+        assert result is not None
+        assert not isinstance(result, str)
+        assert any(lbl.id == label.id for lbl in result.labels)
+
+    async def test_add_label_to_card_cross_board(
+        self, db_session: AsyncSession, sample_board: Board, sample_list: List, sample_card: Card,
+        sample_user_id: uuid.UUID
+    ):
+        """Test adding a label from a different board"""
+        other_board = await TaskService.create_board(
+            db_session, name="Other Board", user_id=sample_user_id
+        )
+        other_label = await TaskService.create_label(
+            db_session, other_board.id, name="Other", color="#0000FF"
+        )
+
+        result = await TaskService.add_label_to_card(db_session, sample_card.id, other_label.id)
+        assert result == "cross_board"
+
+    async def test_add_label_to_card_duplicate(
+        self, db_session: AsyncSession, sample_board: Board, sample_list: List, sample_card: Card
+    ):
+        """Test adding the same label twice"""
+        label = await TaskService.create_label(
+            db_session, sample_board.id, name="Bug", color="#FF5733"
+        )
+
+        await TaskService.add_label_to_card(db_session, sample_card.id, label.id)
+        result = await TaskService.add_label_to_card(db_session, sample_card.id, label.id)
+        assert result == "duplicate"
+
+    async def test_remove_label_from_card(
+        self, db_session: AsyncSession, sample_board: Board, sample_list: List, sample_card: Card
+    ):
+        """Test removing a label from a card"""
+        label = await TaskService.create_label(
+            db_session, sample_board.id, name="Bug", color="#FF5733"
+        )
+        await TaskService.add_label_to_card(db_session, sample_card.id, label.id)
+
+        result = await TaskService.remove_label_from_card(db_session, sample_card.id, label.id)
+        assert result is True
+
+    async def test_remove_label_not_attached(
+        self, db_session: AsyncSession, sample_board: Board, sample_card: Card
+    ):
+        """Test removing a label that isn't attached"""
+        label = await TaskService.create_label(
+            db_session, sample_board.id, name="Bug", color="#FF5733"
+        )
+
+        result = await TaskService.remove_label_from_card(db_session, sample_card.id, label.id)
+        assert result is False
