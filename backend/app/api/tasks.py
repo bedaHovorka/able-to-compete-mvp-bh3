@@ -4,7 +4,7 @@ from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import TaskService, CommentService, DeleteResult
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional, Union
+from typing import List, Optional
 from datetime import datetime
 import uuid
 
