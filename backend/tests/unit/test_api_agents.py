@@ -307,3 +307,203 @@ class TestDevEndpoint:
             assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         finally:
             app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+class TestPipelineEndpoint:
+    """Tests for POST /api/agents/pipeline"""
+
+    async def test_requires_auth(self):
+        """Returns 403 when no JWT is provided."""
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/api/agents/pipeline",
+                json={"requirements": "build a feature"},
+            )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    async def test_full_pipeline_all_three_steps(self):
+        """Runs spec → test + dev in parallel and returns all three outputs."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            spec_result = {"specification": "the spec", "type": "general", "requirements": "req"}
+            test_result = {"test_code": "def test_foo(): pass", "test_type": "unit", "specification": "the spec"}
+            dev_result = {"code": "class Foo: pass", "code_type": "general", "specification": "the spec", "language": "python"}
+
+            with (
+                patch("app.api.agents.SpecAgent") as MockSpec,
+                patch("app.api.agents.TestAgent") as MockTest,
+                patch("app.api.agents.DevAgent") as MockDev,
+            ):
+                MockSpec.return_value.process = AsyncMock(return_value=spec_result)
+                MockTest.return_value.process = AsyncMock(return_value=test_result)
+                MockDev.return_value.process = AsyncMock(return_value=dev_result)
+
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    response = await client.post(
+                        "/api/agents/pipeline",
+                        json={"requirements": "build a login page"},
+                    )
+
+            assert response.status_code == status.HTTP_200_OK
+            body = response.json()
+            assert body["spec"] == "the spec"
+            assert body["tests"] == "def test_foo(): pass"
+            assert body["code"] == "class Foo: pass"
+            assert body["errors"] == {}
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_spec_only_run_step(self):
+        """run_steps=['spec'] runs only SpecAgent and returns spec, leaving tests/code null."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            spec_result = {"specification": "just the spec", "type": "general", "requirements": "req"}
+
+            with patch("app.api.agents.SpecAgent") as MockSpec:
+                MockSpec.return_value.process = AsyncMock(return_value=spec_result)
+
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    response = await client.post(
+                        "/api/agents/pipeline",
+                        json={"requirements": "some req", "run_steps": ["spec"]},
+                    )
+
+            assert response.status_code == status.HTTP_200_OK
+            body = response.json()
+            assert body["spec"] == "just the spec"
+            assert body["tests"] is None
+            assert body["code"] is None
+            assert body["errors"] == {}
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_invalid_order_returns_422(self):
+        """run_steps in wrong canonical order returns 422."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/agents/pipeline",
+                    json={"requirements": "req", "run_steps": ["dev", "spec"]},
+                )
+
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_test_without_spec_returns_422(self):
+        """run_steps=['test'] (without spec) returns 422."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/agents/pipeline",
+                    json={"requirements": "req", "run_steps": ["test"]},
+                )
+
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_dev_without_spec_returns_422(self):
+        """run_steps=['dev'] (without spec) returns 422."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    "/api/agents/pipeline",
+                    json={"requirements": "req", "run_steps": ["dev"]},
+                )
+
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_spec_failure_aborts_pipeline(self):
+        """If SpecAgent raises, pipeline returns immediately with errors['spec'] set."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            with (
+                patch("app.api.agents.SpecAgent") as MockSpec,
+                patch("app.api.agents.TestAgent") as MockTest,
+                patch("app.api.agents.DevAgent") as MockDev,
+            ):
+                MockSpec.return_value.process = AsyncMock(side_effect=RuntimeError("spec boom"))
+                MockTest.return_value.process = AsyncMock()
+                MockDev.return_value.process = AsyncMock()
+
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    response = await client.post(
+                        "/api/agents/pipeline",
+                        json={"requirements": "req"},
+                    )
+
+            assert response.status_code == status.HTTP_200_OK
+            body = response.json()
+            assert body["spec"] is None
+            assert body["tests"] is None
+            assert body["code"] is None
+            assert "spec" in body["errors"]
+            MockTest.return_value.process.assert_not_awaited()
+            MockDev.return_value.process.assert_not_awaited()
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_test_step_failure_captured_in_errors(self):
+        """If TestAgent fails, error is captured and dev still runs."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            spec_result = {"specification": "the spec", "type": "general", "requirements": "req"}
+            dev_result = {"code": "class Foo: pass", "code_type": "general", "specification": "the spec", "language": "python"}
+
+            with (
+                patch("app.api.agents.SpecAgent") as MockSpec,
+                patch("app.api.agents.TestAgent") as MockTest,
+                patch("app.api.agents.DevAgent") as MockDev,
+            ):
+                MockSpec.return_value.process = AsyncMock(return_value=spec_result)
+                MockTest.return_value.process = AsyncMock(side_effect=RuntimeError("test boom"))
+                MockDev.return_value.process = AsyncMock(return_value=dev_result)
+
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    response = await client.post(
+                        "/api/agents/pipeline",
+                        json={"requirements": "req"},
+                    )
+
+            assert response.status_code == status.HTTP_200_OK
+            body = response.json()
+            assert body["spec"] == "the spec"
+            assert body["tests"] is None
+            assert body["code"] == "class Foo: pass"
+            assert "test" in body["errors"]
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_missing_requirements_returns_422(self):
+        """Returns 422 when required 'requirements' field is missing."""
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post("/api/agents/pipeline", json={})
+
+            assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        finally:
+            app.dependency_overrides.clear()
