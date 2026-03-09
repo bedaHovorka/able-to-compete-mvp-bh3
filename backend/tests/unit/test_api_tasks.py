@@ -382,3 +382,146 @@ class TestActivityAPI:
         assert len(data) <= 5
 
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+class TestLabelAPI:
+    """Tests for Label API endpoints"""
+
+    async def test_create_label(self, db_session: AsyncSession, sample_board):
+        """Test creating a label via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                f"/api/boards/{sample_board.id}/labels",
+                json={"name": "Bug", "color": "#FF5733"}
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["name"] == "Bug"
+        assert data["color"] == "#FF5733"
+        assert data["board_id"] == str(sample_board.id)
+
+        app.dependency_overrides.clear()
+
+    async def test_create_label_invalid_color(self, db_session: AsyncSession, sample_board):
+        """Test creating a label with invalid color"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                f"/api/boards/{sample_board.id}/labels",
+                json={"name": "Bug", "color": "red"}
+            )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        app.dependency_overrides.clear()
+
+    async def test_list_labels(self, db_session: AsyncSession, sample_board):
+        """Test listing labels for a board via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+        from app.services.task_service import TaskService
+
+        await TaskService.create_label(db_session, sample_board.id, "Bug", "#FF5733")
+        await TaskService.create_label(db_session, sample_board.id, "Feature", "#33FF57")
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/api/boards/{sample_board.id}/labels")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 2
+
+        app.dependency_overrides.clear()
+
+    async def test_delete_label(self, db_session: AsyncSession, sample_board):
+        """Test deleting a label via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+        from app.services.task_service import TaskService
+
+        label = await TaskService.create_label(db_session, sample_board.id, "Bug", "#FF5733")
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.delete(f"/api/boards/{sample_board.id}/labels/{label.id}")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+        app.dependency_overrides.clear()
+
+    async def test_attach_label_to_card(self, db_session: AsyncSession, sample_board, sample_list, sample_card):
+        """Test attaching a label to a card via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+        from app.services.task_service import TaskService
+
+        label = await TaskService.create_label(db_session, sample_board.id, "Bug", "#FF5733")
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(f"/api/cards/{sample_card.id}/labels/{label.id}")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["labels"]) == 1
+        assert data["labels"][0]["id"] == str(label.id)
+
+        app.dependency_overrides.clear()
+
+    async def test_attach_label_duplicate(self, db_session: AsyncSession, sample_board, sample_list, sample_card):
+        """Test attaching the same label twice returns 409"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+        from app.services.task_service import TaskService
+
+        label = await TaskService.create_label(db_session, sample_board.id, "Bug", "#FF5733")
+        await TaskService.add_label_to_card(db_session, sample_card.id, label.id)
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(f"/api/cards/{sample_card.id}/labels/{label.id}")
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+
+        app.dependency_overrides.clear()
+
+    async def test_remove_label_from_card(self, db_session: AsyncSession, sample_board, sample_list, sample_card):
+        """Test removing a label from a card via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+        from app.services.task_service import TaskService
+
+        label = await TaskService.create_label(db_session, sample_board.id, "Bug", "#FF5733")
+        await TaskService.add_label_to_card(db_session, sample_card.id, label.id)
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.delete(f"/api/cards/{sample_card.id}/labels/{label.id}")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+        app.dependency_overrides.clear()
