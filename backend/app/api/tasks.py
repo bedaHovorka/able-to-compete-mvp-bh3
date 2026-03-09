@@ -4,6 +4,7 @@ from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import TaskService, CommentService, DeleteResult
 from app.models.task import CardPriority
+from app.api.websocket import broadcast_update
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
@@ -256,6 +257,7 @@ async def create_list(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Board not found"
         )
+    await broadcast_update("list_created", ListResponse.model_validate(list_obj).model_dump(mode="json"))
     return list_obj
 
 
@@ -281,6 +283,7 @@ async def create_card(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="List not found"
         )
+    await broadcast_update("card_created", CardResponse.model_validate(card).model_dump(mode="json"))
     return card
 
 
@@ -303,6 +306,11 @@ async def move_card(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Card not found"
         )
+    await broadcast_update("card_moved", {
+        "card_id": str(card.id),
+        "list_id": str(card.list_id),
+        "position": card.position,
+    })
     return card
 
 

@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Layout, Trello } from 'lucide-react'
 import { boards, lists, cards } from '../lib/api'
 import { Row, Col, Card, Button, Form, Badge, Modal } from 'react-bootstrap'
+import { useWebSocket } from '../hooks/useWebSocket'
+import type { WsMessage } from '../hooks/useWebSocket'
+import type { Board, Card as CardType } from '../types'
 
 export default function TaskBoard() {
   const queryClient = useQueryClient()
@@ -14,6 +17,48 @@ export default function TaskBoard() {
   const [newListName, setNewListName] = useState('')
   const [newCardTitle, setNewCardTitle] = useState('')
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
+
+  const handleWsMessage = useCallback(
+    (msg: WsMessage) => {
+      const { type, data } = msg
+
+      if (type === 'card_created' || type === 'list_created') {
+        // Re-fetch the board so the new item appears without a manual refresh
+        queryClient.invalidateQueries({ queryKey: ['board', selectedBoard] })
+      } else if (type === 'card_moved') {
+        const cardId = data.card_id as string
+        const newListId = data.list_id as string
+        const position = data.position as number
+        queryClient.setQueryData<Board>(['board', selectedBoard], (old) => {
+          if (!old) return old
+          const existingCard = old.lists
+            ?.flatMap((l) => l.cards ?? [])
+            .find((c) => c.id === cardId)
+          if (!existingCard) return old
+          const updatedCard: CardType = { ...existingCard, list_id: newListId, position }
+          return {
+            ...old,
+            lists: old.lists?.map((l) => {
+              if (l.id === existingCard.list_id && l.id !== newListId) {
+                return { ...l, cards: (l.cards ?? []).filter((c) => c.id !== cardId) }
+              }
+              if (l.id === newListId) {
+                const filtered = (l.cards ?? []).filter((c) => c.id !== cardId)
+                return {
+                  ...l,
+                  cards: [...filtered, updatedCard].sort((a, b) => a.position - b.position),
+                }
+              }
+              return l
+            }),
+          }
+        })
+      }
+    },
+    [queryClient, selectedBoard],
+  )
+
+  useWebSocket('/ws/tasks', handleWsMessage)
 
   const { data: boardsList } = useQuery({
     queryKey: ['boards'],

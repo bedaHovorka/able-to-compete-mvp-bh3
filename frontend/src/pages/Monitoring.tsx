@@ -1,12 +1,44 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Activity, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { Plus, Activity, CheckCircle, XCircle, AlertTriangle, Wifi } from 'lucide-react'
 import { monitors } from '../lib/api'
+import { useWebSocket } from '../hooks/useWebSocket'
+import type { WsMessage } from '../hooks/useWebSocket'
+import type { Monitor } from '../types'
 
 export default function Monitoring() {
   const queryClient = useQueryClient()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval: 60 })
+  const [incidentBanner, setIncidentBanner] = useState<string | null>(null)
+
+  const handleWsMessage = useCallback(
+    (msg: WsMessage) => {
+      const { type, data } = msg
+      if (type === 'monitor_updated') {
+        const updated = data as unknown as Monitor
+        queryClient.setQueryData<Monitor[]>(['monitors'], (old) => {
+          if (!old) return old
+          return old.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
+        })
+      } else if (type === 'incident_created') {
+        const monitorId = data.monitor_id as string | undefined
+        const title = data.title as string | undefined
+        const monitorName =
+          queryClient
+            .getQueryData<Monitor[]>(['monitors'])
+            ?.find((m) => m.id === monitorId)?.name ?? 'A monitor'
+        setIncidentBanner(`🚨 Incident: ${title ?? `${monitorName} is down`}`)
+        queryClient.invalidateQueries({ queryKey: ['monitors'] })
+      } else if (type === 'incident_resolved') {
+        setIncidentBanner(null)
+        queryClient.invalidateQueries({ queryKey: ['monitors'] })
+      }
+    },
+    [queryClient],
+  )
+
+  const { connected } = useWebSocket('/ws/monitoring', handleWsMessage)
 
   const { data: monitorsList } = useQuery({
     queryKey: ['monitors'],
@@ -60,9 +92,36 @@ export default function Monitoring() {
 
   return (
     <div className="space-y-6">
+      {/* Incident banner */}
+      {incidentBanner && (
+        <div className="flex items-center justify-between rounded-md bg-red-50 px-4 py-3 text-sm text-red-800 shadow">
+          <span>{incidentBanner}</span>
+          <button
+            onClick={() => setIncidentBanner(null)}
+            className="ml-4 font-medium hover:text-red-600"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Monitoring</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900">Monitoring</h1>
+            {connected ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                <Wifi className="w-3 h-3" />
+                Live
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                <Wifi className="w-3 h-3" />
+                Connecting…
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-gray-600">
             Monitor your services and APIs
           </p>

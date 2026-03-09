@@ -6,6 +6,7 @@ from app.utils.auth import get_current_active_user
 from app.services import MonitorService
 from app.agents import MonitorAgent
 from app.models import Check, MonitorStatus, MonitorType
+from app.api.websocket import broadcast_update
 from pydantic import AnyUrl, BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
@@ -202,6 +203,7 @@ async def trigger_check(
         raise HTTPException(status_code=404, detail="Monitor not found")
 
     check = await monitor_service.execute_check(db, monitor)
+    await broadcast_update("monitor_updated", MonitorResponse.model_validate(monitor).model_dump(mode="json"))
     return {"status": "success", "check_id": check.id}
 
 
