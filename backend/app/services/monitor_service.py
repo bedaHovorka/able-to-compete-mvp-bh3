@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
-from app.models import Monitor, Check, Incident, MonitorStatus, IncidentStatus, IncidentSeverity
+from app.models import Monitor, Check, Incident, MonitorStatus, MonitorType, IncidentStatus, IncidentSeverity
 from app.utils.logger import logger
 from app.utils.database import AsyncSessionLocal
 from typing import Optional, List as ListType, Dict
@@ -66,6 +66,9 @@ class MonitorService:
 
     async def execute_check(self, db: AsyncSession, monitor: Monitor) -> Check:
         """Execute a single health check"""
+        if monitor.type == MonitorType.SSL:
+            return await self._execute_ssl_check_flow(db, monitor)
+
         start_time = datetime.utcnow()
         status = MonitorStatus.DOWN
         response_time = None
@@ -114,6 +117,125 @@ class MonitorService:
         await self.handle_incident(db, monitor, status)
 
         return check
+
+    async def _execute_ssl_check(self, monitor: Monitor) -> int:
+        """Execute an SSL certificate check and return days until expiry."""
+        import ssl
+        import socket
+        from concurrent.futures import ThreadPoolExecutor
+        from urllib.parse import urlparse
+
+        def _check_sync():
+            hostname = urlparse(monitor.url).hostname
+            ctx = ssl.create_default_context()
+            with socket.create_connection((hostname, 443), timeout=monitor.timeout) as sock:
+                with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
+                    cert = ssock.getpeercert()
+            # notAfter format: "Nov 25 12:59:59 2024 GMT" — strip timezone suffix for naive UTC comparison
+            not_after = cert["notAfter"].replace(" GMT", "")
+            expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y")
+            return (expiry - datetime.utcnow()).days
+
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor() as pool:
+            return await loop.run_in_executor(pool, _check_sync)
+
+    async def _execute_ssl_check_flow(self, db: AsyncSession, monitor: Monitor) -> Check:
+        """Execute SSL check and persist a Check record; handle incidents immediately."""
+        ssl_expiry_days = None
+        status = MonitorStatus.DOWN
+        error_message = None
+
+        try:
+            import ssl as ssl_module
+            ssl_expiry_days = await self._execute_ssl_check(monitor)
+
+            if ssl_expiry_days > 30:
+                status = MonitorStatus.UP
+            elif ssl_expiry_days >= 1:
+                status = MonitorStatus.DEGRADED
+            else:
+                status = MonitorStatus.DOWN
+
+        except ssl_module.SSLCertVerificationError:
+            ssl_expiry_days = 0
+            status = MonitorStatus.DOWN
+            error_message = "SSL certificate verification failed"
+        except Exception as e:
+            status = MonitorStatus.DOWN
+            error_message = str(e)
+
+        check = Check(
+            monitor_id=monitor.id,
+            status=status,
+            ssl_expiry_days=ssl_expiry_days,
+            error_message=error_message
+        )
+        db.add(check)
+
+        monitor.status = status
+        monitor.last_checked_at = datetime.utcnow()
+
+        await db.commit()
+        await db.refresh(check)
+
+        logger.info(f"SSL check completed for monitor {monitor.id}: {status} (expiry_days={ssl_expiry_days})")
+
+        # SSL incidents are created immediately without the 3-failure wait
+        await self.handle_ssl_incident(db, monitor, status, ssl_expiry_days)
+
+        return check
+
+    async def handle_ssl_incident(self, db: AsyncSession, monitor: Monitor, status: MonitorStatus, ssl_expiry_days: Optional[int]):
+        """Handle incident creation and resolution for SSL monitors (no 3-failure wait)."""
+        # Check for existing open incident
+        query = select(Incident).where(
+            and_(
+                Incident.monitor_id == monitor.id,
+                Incident.status.in_([IncidentStatus.INVESTIGATING, IncidentStatus.IDENTIFIED])
+            )
+        )
+        result = await db.execute(query)
+        existing_incident = result.scalar_one_or_none()
+
+        if status == MonitorStatus.DOWN:
+            if not existing_incident:
+                if ssl_expiry_days is not None and ssl_expiry_days < 0:
+                    days_msg = f" (expired {abs(ssl_expiry_days)} day(s) ago)"
+                elif ssl_expiry_days == 0:
+                    days_msg = " (expired today)"
+                else:
+                    days_msg = ""
+                incident = Incident(
+                    monitor_id=monitor.id,
+                    title=f"{monitor.name} SSL certificate is expired or invalid",
+                    description=f"SSL certificate for {monitor.name} has expired or failed verification{days_msg}",
+                    severity=IncidentSeverity.CRITICAL,
+                    status=IncidentStatus.INVESTIGATING
+                )
+                db.add(incident)
+                await db.commit()
+                logger.warning(f"Created critical SSL incident for monitor {monitor.id}")
+
+        elif status == MonitorStatus.DEGRADED:
+            if not existing_incident:
+                incident = Incident(
+                    monitor_id=monitor.id,
+                    title=f"{monitor.name} SSL certificate expiring soon",
+                    description=f"SSL certificate for {monitor.name} expires in {ssl_expiry_days} day(s)",
+                    severity=IncidentSeverity.HIGH,
+                    status=IncidentStatus.INVESTIGATING
+                )
+                db.add(incident)
+                await db.commit()
+                logger.warning(f"Created high SSL expiry incident for monitor {monitor.id}")
+
+        elif status == MonitorStatus.UP:
+            if existing_incident:
+                existing_incident.status = IncidentStatus.RESOLVED
+                existing_incident.resolved_at = datetime.utcnow()
+                await db.commit()
+                logger.info(f"Auto-resolved SSL incident {existing_incident.id}")
 
     async def handle_incident(self, db: AsyncSession, monitor: Monitor, status: MonitorStatus):
         """Handle incident creation and resolution"""
