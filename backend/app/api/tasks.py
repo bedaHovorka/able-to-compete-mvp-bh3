@@ -273,7 +273,8 @@ async def create_card(
         list_id,
         title=card_data.title,
         description=card_data.description,
-        position=card_data.position
+        position=card_data.position,
+        priority=card_data.priority
     )
     if not card:
         raise HTTPException(
@@ -303,6 +304,35 @@ async def move_card(
             detail="Card not found"
         )
     return card
+
+
+@router.put("/cards/{card_id}", response_model=CardResponse)
+async def update_card(
+    card_id: uuid.UUID,
+    card_data: CardUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Update card fields"""
+    card = await TaskService.update_card(db, card_id, card_data)
+    if not card:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card not found"
+        )
+    return card
+
+
+@router.get("/boards/{board_id}/cards", response_model=List[CardResponse])
+async def get_board_cards(
+    board_id: uuid.UUID,
+    priority: Optional[CardPriority] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """List all cards for a board with optional priority filter"""
+    cards = await TaskService.get_cards_for_board(db, board_id, priority=priority)
+    return cards
 
 
 # Activity log endpoint
