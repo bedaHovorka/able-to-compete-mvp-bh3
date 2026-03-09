@@ -73,6 +73,22 @@ class DashboardMetrics(BaseModel):
     avg_uptime: float
 
 
+class IncidentResponse(BaseModel):
+    id: uuid.UUID
+    monitor_id: uuid.UUID
+    title: str
+    description: Optional[str]
+    status: str
+    severity: str
+    started_at: datetime
+    resolved_at: Optional[datetime]
+    acknowledged_at: Optional[datetime]
+    acknowledged_by: Optional[uuid.UUID]
+
+    class Config:
+        from_attributes = True
+
+
 async def _get_ssl_expiry_days(db: AsyncSession, monitor_id: uuid.UUID) -> Optional[int]:
     """Return ssl_expiry_days from the latest check for an SSL monitor, or None."""
     query = (
