@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_
 from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import MonitorService
 from app.agents import MonitorAgent
+from app.models import Check, MonitorStatus
 from pydantic import AnyUrl, BaseModel
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 router = APIRouter(prefix="/api", tags=["monitoring"])
@@ -138,12 +140,43 @@ async def get_status_page(db: AsyncSession = Depends(get_db)):
         "last_updated": datetime.utcnow().isoformat()
     }
 
+    if not monitors:
+        return status_data
+
+    # Batch load all checks for all monitors in the last 24 hours (single query)
+    monitor_ids = [m.id for m in monitors]
+    since = datetime.utcnow() - timedelta(hours=24)
+    checks_query = select(Check).where(
+        and_(
+            Check.monitor_id.in_(monitor_ids),
+            Check.checked_at >= since
+        )
+    )
+    checks_result = await db.execute(checks_query)
+    all_checks = checks_result.scalars().all()
+
+    # Group checks by monitor_id in Python
+    checks_by_monitor: Dict = {}
+    for check in all_checks:
+        mid = check.monitor_id
+        if mid not in checks_by_monitor:
+            checks_by_monitor[mid] = []
+        checks_by_monitor[mid].append(check)
+
+    # Calculate uptime per monitor in Python (no additional DB queries)
     for monitor in monitors:
-        uptime = await monitor_service.calculate_uptime(db, monitor.id, hours=24)
+        monitor_checks = checks_by_monitor.get(monitor.id, [])
+        if not monitor_checks:
+            uptime_percentage = 100.0
+        else:
+            total = len(monitor_checks)
+            up_count = sum(1 for c in monitor_checks if c.status == MonitorStatus.UP)
+            uptime_percentage = round((up_count / total) * 100, 2)
+
         status_data["monitors"].append({
             "name": monitor.name,
             "status": monitor.status,
-            "uptime_24h": uptime["uptime_percentage"]
+            "uptime_24h": uptime_percentage
         })
 
     return status_data
