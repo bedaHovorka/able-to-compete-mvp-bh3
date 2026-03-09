@@ -33,6 +33,9 @@ export default function TaskBoard() {
       setNewBoardName('')
       setShowNewBoardModal(false)
     },
+    onError: (error) => {
+      console.error('Failed to create board:', error)
+    },
   })
 
   const createListMutation = useMutation({
@@ -42,6 +45,9 @@ export default function TaskBoard() {
       queryClient.invalidateQueries({ queryKey: ['board', selectedBoard] })
       setNewListName('')
       setShowNewListModal(false)
+    },
+    onError: (error) => {
+      console.error('Failed to create list:', error)
     },
   })
 
@@ -53,6 +59,9 @@ export default function TaskBoard() {
       setNewCardTitle('')
       setShowNewCardModal(false)
       setSelectedListId(null)
+    },
+    onError: (error) => {
+      console.error('Failed to create card:', error)
     },
   })
 

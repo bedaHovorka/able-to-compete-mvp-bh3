@@ -46,12 +46,12 @@ class Check(Base):
     __tablename__ = "checks"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
+    monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False, index=True)
     status = Column(SQLEnum(MonitorStatus), nullable=False)
     response_time = Column(Float, nullable=True)  # milliseconds
     status_code = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
-    checked_at = Column(DateTime, default=datetime.utcnow)
+    checked_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     monitor = relationship("Monitor", back_populates="checks")
 
@@ -74,7 +74,7 @@ class Incident(Base):
     __tablename__ = "incidents"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False)
+    monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False, index=True)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(SQLEnum(IncidentStatus), nullable=False, default=IncidentStatus.INVESTIGATING)

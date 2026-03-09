@@ -20,12 +20,18 @@ export default function Monitoring() {
       setShowCreateForm(false)
       setNewMonitor({ name: '', url: '', interval: 60 })
     },
+    onError: (error) => {
+      console.error('Failed to create monitor:', error)
+    },
   })
 
   const triggerCheckMutation = useMutation({
     mutationFn: (id: string) => monitors.check(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monitors'] })
+    },
+    onError: (error) => {
+      console.error('Failed to trigger check:', error)
     },
   })
 

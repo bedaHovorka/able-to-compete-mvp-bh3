@@ -1,22 +1,26 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-from app.models import Monitor, Check, Incident, Metric, MonitorStatus, IncidentStatus, IncidentSeverity
+from sqlalchemy import select, and_
+from app.models import Monitor, Check, Incident, MonitorStatus, IncidentStatus, IncidentSeverity
 from app.utils.logger import logger
+from app.utils.database import AsyncSessionLocal
 from typing import Optional, List as ListType, Dict
 from datetime import datetime, timedelta
 import httpx
 import asyncio
 import uuid
 
+# Module-level singletons so state survives multiple MonitorService instantiations
+failure_counts: dict = {}
+active_monitors: dict = {}
+
 
 class MonitorService:
     def __init__(self):
-        self.active_monitors = {}
-        self.failure_counts = {}
+        pass
 
-    async def create_monitor(self, db: AsyncSession, name: str, url: str, interval: int = 60, monitor_type: str = "https") -> Monitor:
+    async def create_monitor(self, db: AsyncSession, name: str, url: str, interval: int = 60, monitor_type: str = "https", timeout: int = 10, expected_status_code: int = 200) -> Monitor:
         """Create a new monitor"""
-        monitor = Monitor(name=name, url=url, interval=interval, type=monitor_type)
+        monitor = Monitor(name=name, url=url, interval=interval, type=monitor_type, timeout=timeout, expected_status_code=expected_status_code)
         db.add(monitor)
         await db.commit()
         await db.refresh(monitor)
@@ -92,8 +96,8 @@ class MonitorService:
         monitor_id_str = str(monitor.id)
 
         # Initialize failure count if needed
-        if monitor_id_str not in self.failure_counts:
-            self.failure_counts[monitor_id_str] = 0
+        if monitor_id_str not in failure_counts:
+            failure_counts[monitor_id_str] = 0
 
         # Check for existing open incident
         query = select(Incident).where(
@@ -106,14 +110,14 @@ class MonitorService:
         existing_incident = result.scalar_one_or_none()
 
         if status == MonitorStatus.DOWN:
-            self.failure_counts[monitor_id_str] += 1
+            failure_counts[monitor_id_str] += 1
 
             # Create incident after 3 consecutive failures
-            if self.failure_counts[monitor_id_str] >= 3 and not existing_incident:
+            if failure_counts[monitor_id_str] >= 3 and not existing_incident:
                 incident = Incident(
                     monitor_id=monitor.id,
                     title=f"{monitor.name} is down",
-                    description=f"Monitor {monitor.name} has failed {self.failure_counts[monitor_id_str]} consecutive checks",
+                    description=f"Monitor {monitor.name} has failed {failure_counts[monitor_id_str]} consecutive checks",
                     severity=IncidentSeverity.CRITICAL,
                     status=IncidentStatus.INVESTIGATING
                 )
@@ -122,7 +126,7 @@ class MonitorService:
                 logger.warning(f"Created incident for monitor {monitor.id}")
 
         elif status == MonitorStatus.UP:
-            self.failure_counts[monitor_id_str] = 0
+            failure_counts[monitor_id_str] = 0
 
             # Auto-resolve incident if exists
             if existing_incident:
@@ -168,26 +172,32 @@ class MonitorService:
             return
 
         monitor_id_str = str(monitor_id)
-        if monitor_id_str in self.active_monitors:
+        if monitor_id_str in active_monitors:
             return
 
         async def monitor_loop():
-            while monitor_id_str in self.active_monitors:
+            while monitor_id_str in active_monitors:
                 try:
-                    await self.execute_check(db, monitor)
-                    await asyncio.sleep(monitor.interval)
+                    async with AsyncSessionLocal() as loop_db:
+                        fresh_monitor = await self.get_monitor(loop_db, monitor_id)
+                        if fresh_monitor is None or not fresh_monitor.enabled:
+                            active_monitors.pop(monitor_id_str, None)
+                            logger.info(f"Monitor {monitor_id} deleted or disabled — stopping loop")
+                            break
+                        await self.execute_check(loop_db, fresh_monitor)
+                    await asyncio.sleep(fresh_monitor.interval)
                 except Exception as e:
                     logger.error(f"Error in monitor loop for {monitor_id}: {e}")
                     await asyncio.sleep(monitor.interval)
 
         task = asyncio.create_task(monitor_loop())
-        self.active_monitors[monitor_id_str] = task
+        active_monitors[monitor_id_str] = task
         logger.info(f"Started monitoring for {monitor_id}")
 
     async def stop_monitoring(self, monitor_id: uuid.UUID):
         """Stop monitoring loop for a monitor"""
         monitor_id_str = str(monitor_id)
-        if monitor_id_str in self.active_monitors:
-            task = self.active_monitors.pop(monitor_id_str)
+        if monitor_id_str in active_monitors:
+            task = active_monitors.pop(monitor_id_str)
             task.cancel()
             logger.info(f"Stopped monitoring for {monitor_id}")

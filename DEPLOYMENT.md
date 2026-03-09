@@ -290,7 +290,7 @@ docker-compose ps db
 **Missing dependencies:**
 ```bash
 # Reinstall
-python3.11 -m pip install -r backend/requirements.txt
+cd backend && uv sync
 ```
 
 ### Frontend Issues (if you start it)

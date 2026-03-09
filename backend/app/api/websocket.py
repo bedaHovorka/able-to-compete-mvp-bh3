@@ -2,7 +2,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.utils.logger import logger
 from typing import List
 import json
-import asyncio
 
 router = APIRouter()
 

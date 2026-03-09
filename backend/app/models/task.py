@@ -13,7 +13,7 @@ class Board(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True, index=True)
     user_id = Column(Uuid(as_uuid=True), nullable=True)
 
     lists = relationship("List", back_populates="board", cascade="all, delete-orphan")
@@ -24,7 +24,7 @@ class List(Base):
     __tablename__ = "lists"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    board_id = Column(Uuid(as_uuid=True), ForeignKey("boards.id"), nullable=False)
+    board_id = Column(Uuid(as_uuid=True), ForeignKey("boards.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     position = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -38,7 +38,7 @@ class Card(Base):
     __tablename__ = "cards"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    list_id = Column(Uuid(as_uuid=True), ForeignKey("lists.id"), nullable=False)
+    list_id = Column(Uuid(as_uuid=True), ForeignKey("lists.id"), nullable=False, index=True)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     position = Column(Integer, nullable=False, default=0)
@@ -54,12 +54,12 @@ class Activity(Base):
     __tablename__ = "activities"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    board_id = Column(Uuid(as_uuid=True), ForeignKey("boards.id"), nullable=False)
+    board_id = Column(Uuid(as_uuid=True), ForeignKey("boards.id"), nullable=False, index=True)
     user_id = Column(Uuid(as_uuid=True), nullable=True)
     action = Column(String(100), nullable=False)
     entity_type = Column(String(50), nullable=False)
     entity_id = Column(Uuid(as_uuid=True), nullable=False)
     details = Column(Text, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
     board = relationship("Board", back_populates="activities")

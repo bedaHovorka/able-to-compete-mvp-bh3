@@ -158,7 +158,7 @@ Response: {
 ### Backend Setup
 ```bash
 cd backend
-pip3 install -r requirements.txt
+uv sync
 export DATABASE_URL="postgresql://user:pass@localhost:5432/abletocompete"
 export REDIS_URL="redis://localhost:6379"
 python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8005 --reload
@@ -254,7 +254,7 @@ able-to-compete-mvp-bh3/
 │   │   └── main.py        # FastAPI application
 │   ├── tests/
 │   │   └── unit/          # 81 unit tests
-│   └── requirements.txt
+│   └── pyproject.toml     # Python dependencies (managed with uv)
 ├── frontend/
 │   ├── src/
 │   │   ├── components/    # React components

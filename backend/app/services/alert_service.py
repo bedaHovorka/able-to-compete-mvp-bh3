@@ -1,9 +1,8 @@
 from app.models import Incident, Monitor
 from app.utils.logger import logger
 from app.config import settings
-from typing import Dict, List
-from datetime import datetime, timedelta
-import asyncio
+from typing import List
+from datetime import datetime
 import httpx
 
 

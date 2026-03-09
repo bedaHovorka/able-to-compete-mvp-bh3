@@ -28,7 +28,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     request_body = json.loads(body.decode())
                 # request._body is now cached by starlette; no need to patch
                 # _receive — wrapped_receive serves the body from cache automatically.
-            except:
+            except Exception:
                 pass
 
         # Process request

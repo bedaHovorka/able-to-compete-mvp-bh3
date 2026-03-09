@@ -85,8 +85,8 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (uses uv)
+uv sync
 
 # Create .env file
 cp .env.example .env
@@ -175,7 +175,7 @@ pytest --cov=backend.app tests/
 
 1. Create new Web Service
 2. Connect GitHub repository
-3. Build command: `pip install -r requirements.txt`
+3. Build command: `uv sync`
 4. Start command: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
 
 ### Deploy to Fly.io
@@ -225,7 +225,7 @@ able-to-compete-mvp-bh3/
 │   │   ├── config.py        # Configuration
 │   │   └── main.py          # FastAPI application
 │   ├── tests/               # BDD tests
-│   ├── requirements.txt     # Python dependencies
+│   ├── pyproject.toml       # Python dependencies (managed with uv)
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
