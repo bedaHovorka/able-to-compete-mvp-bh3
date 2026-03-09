@@ -124,7 +124,7 @@ export default function Monitoring() {
 
   const { data: incidentsList } = useQuery({
     queryKey: ['incidents'],
-    queryFn: () => incidents.list().then((res) => res.data),
+    queryFn: () => incidents.list().then((res: { data: Incident[] }) => res.data),
   })
 
   const createMonitorMutation = useMutation({
@@ -425,7 +425,7 @@ export default function Monitoring() {
           </div>
         ) : (
           <div className="bg-white shadow rounded-lg divide-y divide-gray-200">
-            {incidentsList.map((incident) => {
+            {incidentsList.map((incident: Incident) => {
               const analysisState = incidentAnalysis[incident.id] ?? DEFAULT_ANALYSIS_STATE
               const isExpanded = !!expandedIncidents[incident.id]
 

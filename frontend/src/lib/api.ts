@@ -103,6 +103,15 @@ export interface DevResponse {
   language: string
 }
 
+export const incidents = {
+  list: (monitorId?: string) =>
+    api.get<Incident[]>('/incidents', monitorId ? { params: { monitor_id: monitorId } } : undefined),
+  analyzeWithAI: (incidentId: string, analysisType: string) =>
+    api.post<AnalysisResult>('/ai/analyze-incident', null, {
+      params: { incident_id: incidentId, analysis_type: analysisType },
+    }),
+}
+
 export const agents = {
   spec: (data: { requirements: string; type: string }) =>
     api.post<SpecResponse>('/agents/spec', data),
