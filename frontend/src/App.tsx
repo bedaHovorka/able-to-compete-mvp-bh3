@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import TaskBoard from './pages/TaskBoard'
 import Monitoring from './pages/Monitoring'
 import StatusPage from './pages/StatusPage'
+import Agents from './pages/Agents'
 import NotFound from './pages/NotFound'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="tasks" element={<TaskBoard />} />
         <Route path="monitoring" element={<Monitoring />} />
+        <Route path="agents" element={<Agents />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
