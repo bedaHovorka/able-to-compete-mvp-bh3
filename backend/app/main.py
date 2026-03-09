@@ -1,11 +1,26 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from app.config import settings
 from app.utils.logger import logger
 from app.utils.middleware import AuditMiddleware, RateLimitMiddleware
 from app.utils.database import engine, Base
+from app.utils.auth import get_current_active_user
 from app.api import auth, tasks, monitoring, websocket
 from contextlib import asynccontextmanager
+
+
+# Request models for AI endpoints
+class SpecRequest(BaseModel):
+    requirements: str
+
+
+class TestRequest(BaseModel):
+    specification: str
+
+
+class CodeRequest(BaseModel):
+    specification: str
 
 
 @asynccontextmanager
@@ -104,32 +119,41 @@ async def list_ai_agents():
 
 
 @app.post("/api/ai/generate-specs")
-async def generate_specs(requirements: dict):
+async def generate_specs(
+    body: SpecRequest,
+    current_user: dict = Depends(get_current_active_user),
+):
     """Generate specifications using AI agent"""
     from app.agents import SpecAgent
 
     agent = SpecAgent()
-    result = await agent.process(requirements)
+    result = await agent.process({"requirements": body.requirements})
     return result
 
 
 @app.post("/api/ai/generate-tests")
-async def generate_tests(specification: dict):
+async def generate_tests(
+    body: TestRequest,
+    current_user: dict = Depends(get_current_active_user),
+):
     """Generate test code using AI agent"""
     from app.agents import TestAgent
 
     agent = TestAgent()
-    result = await agent.process(specification)
+    result = await agent.process({"specification": body.specification})
     return result
 
 
 @app.post("/api/ai/generate-code")
-async def generate_code(specification: dict):
+async def generate_code(
+    body: CodeRequest,
+    current_user: dict = Depends(get_current_active_user),
+):
     """Generate code using AI agent"""
     from app.agents import DevAgent
 
     agent = DevAgent()
-    result = await agent.process(specification)
+    result = await agent.process({"specification": body.specification})
     return result
 
 

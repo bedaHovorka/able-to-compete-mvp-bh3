@@ -4,7 +4,7 @@ from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import MonitorService
 from app.agents import MonitorAgent
-from pydantic import BaseModel
+from pydantic import AnyUrl, BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime
 import uuid
@@ -19,7 +19,7 @@ monitor_agent = MonitorAgent()
 # Schemas
 class MonitorCreate(BaseModel):
     name: str
-    url: str
+    url: AnyUrl
     interval: int = 60
     type: str = "https"
     timeout: int = 10
