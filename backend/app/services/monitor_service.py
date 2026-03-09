@@ -295,7 +295,7 @@ class MonitorService:
         checks = result.scalars().all()
 
         if not checks:
-            return {"uptime_percentage": 100.0, "total_checks": 0, "failed_checks": 0}
+            return {"uptime_percentage": 100.0, "total_checks": 0, "failed_checks": 0, "avg_response_time": None}
 
         total_checks = len(checks)
         up_checks = sum(1 for check in checks if check.status == MonitorStatus.UP)

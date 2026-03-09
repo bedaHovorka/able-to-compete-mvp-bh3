@@ -6,11 +6,69 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import type { WsMessage } from '../hooks/useWebSocket'
 import type { Monitor } from '../types'
 
+interface UptimeData {
+  uptime_percentage: number
+  total_checks: number
+  failed_checks: number
+  avg_response_time: number | null
+}
+
+interface UptimeCellProps {
+  monitorId: string
+  hours: number
+}
+
+function UptimeCell({ monitorId, hours }: UptimeCellProps) {
+  const { data: uptime, isLoading } = useQuery<UptimeData>({
+    queryKey: ['uptime', monitorId, hours],
+    queryFn: () => monitors.uptime(monitorId, hours).then((res) => res.data),
+  })
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse space-y-1">
+        <div className="h-4 w-16 bg-gray-200 rounded-full" />
+        <div className="h-3 w-12 bg-gray-100 rounded" />
+      </div>
+    )
+  }
+
+  if (!uptime) return <span className="text-gray-400 text-sm">—</span>
+
+  const pct = uptime.uptime_percentage
+  const badgeClass =
+    pct >= 99
+      ? 'bg-green-100 text-green-800'
+      : pct >= 90
+      ? 'bg-yellow-100 text-yellow-800'
+      : 'bg-red-100 text-red-800'
+
+  return (
+    <div>
+      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${badgeClass}`}>
+        {pct.toFixed(2)}%
+      </span>
+      <div className="text-xs text-gray-500 mt-1">
+        {uptime.avg_response_time != null
+          ? `${Math.round(uptime.avg_response_time)}ms avg`
+          : 'No data'}
+      </div>
+    </div>
+  )
+}
+
+const TIME_RANGE_OPTIONS = [
+  { label: 'Last 24h', hours: 24 },
+  { label: 'Last 7 days', hours: 7 * 24 },
+  { label: 'Last 30 days', hours: 30 * 24 },
+]
+
 export default function Monitoring() {
   const queryClient = useQueryClient()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval: 60 })
   const [incidentBanner, setIncidentBanner] = useState<string | null>(null)
+  const [uptimeHours, setUptimeHours] = useState(24)
 
   const handleWsMessage = useCallback(
     (msg: WsMessage) => {
@@ -61,6 +119,7 @@ export default function Monitoring() {
     mutationFn: (id: string) => monitors.check(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monitors'] })
+      queryClient.invalidateQueries({ queryKey: ['uptime'] })
     },
     onError: (error) => {
       console.error('Failed to trigger check:', error)
@@ -126,13 +185,26 @@ export default function Monitoring() {
             Monitor your services and APIs
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Monitor
-        </button>
+        <div className="flex items-center space-x-3">
+          <select
+            value={uptimeHours}
+            onChange={(e) => setUptimeHours(Number(e.target.value))}
+            className="text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+          >
+            {TIME_RANGE_OPTIONS.map((opt) => (
+              <option key={opt.hours} value={opt.hours}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Monitor
+          </button>
+        </div>
       </div>
 
       {/* Create Form */}
@@ -200,6 +272,9 @@ export default function Monitoring() {
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Uptime
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 URL
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -227,6 +302,9 @@ export default function Monitoring() {
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(monitor.status)}`}>
                     {monitor.status}
                   </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <UptimeCell monitorId={monitor.id} hours={uptimeHours} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {monitor.url}
