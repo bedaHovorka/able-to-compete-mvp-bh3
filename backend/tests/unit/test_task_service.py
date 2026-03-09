@@ -5,7 +5,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.task_service import TaskService
 from app.models import Board, List, Card, Activity, Label
+from app.models.task import CardPriority
 import uuid
+
 
 @pytest.mark.asyncio
 class TestTaskServiceBoard:
@@ -357,6 +359,79 @@ class TestTaskServiceCard:
         )
 
         assert result is None
+
+    async def test_create_card_with_priority(self, db_session: AsyncSession, sample_list: List):
+        """Test creating a card with explicit priority"""
+        card = await TaskService.create_card(
+            db_session,
+            sample_list.id,
+            "High Priority Task",
+            priority=CardPriority.HIGH
+        )
+
+        assert card is not None
+        assert card.priority == CardPriority.HIGH
+
+    async def test_create_card_default_priority(self, db_session: AsyncSession, sample_list: List):
+        """Test that card defaults to medium priority"""
+        card = await TaskService.create_card(
+            db_session,
+            sample_list.id,
+            "Default Priority Task"
+        )
+
+        assert card is not None
+        assert card.priority == CardPriority.MEDIUM
+
+    async def test_update_card(self, db_session: AsyncSession, sample_card: Card):
+        """Test updating a card"""
+        from app.api.tasks import CardUpdate
+
+        updated = await TaskService.update_card(
+            db_session,
+            sample_card.id,
+            CardUpdate(title="Updated Title", priority=CardPriority.CRITICAL)
+        )
+
+        assert updated is not None
+        assert updated.title == "Updated Title"
+        assert updated.priority == CardPriority.CRITICAL
+
+    async def test_update_nonexistent_card(self, db_session: AsyncSession):
+        """Test updating a card that doesn't exist"""
+        from app.api.tasks import CardUpdate
+
+        result = await TaskService.update_card(
+            db_session,
+            uuid.uuid4(),
+            CardUpdate(title="Should Fail")
+        )
+
+        assert result is None
+
+    async def test_get_cards_for_board(
+        self, db_session: AsyncSession, sample_board: Board, sample_list: List
+    ):
+        """Test getting all cards for a board"""
+        await TaskService.create_card(db_session, sample_list.id, "Card 1", priority=CardPriority.LOW)
+        await TaskService.create_card(db_session, sample_list.id, "Card 2", priority=CardPriority.HIGH)
+
+        cards = await TaskService.get_cards_for_board(db_session, sample_board.id)
+
+        assert len(cards) >= 2
+
+    async def test_get_cards_for_board_with_priority_filter(
+        self, db_session: AsyncSession, sample_board: Board, sample_list: List
+    ):
+        """Test filtering cards by priority"""
+        await TaskService.create_card(db_session, sample_list.id, "Low Card", priority=CardPriority.LOW)
+        await TaskService.create_card(db_session, sample_list.id, "High Card", priority=CardPriority.HIGH)
+        await TaskService.create_card(db_session, sample_list.id, "Critical Card", priority=CardPriority.CRITICAL)
+
+        high_cards = await TaskService.get_cards_for_board(db_session, sample_board.id, priority=CardPriority.HIGH)
+
+        assert len(high_cards) == 1
+        assert high_cards[0].priority == CardPriority.HIGH
 
 
 @pytest.mark.asyncio

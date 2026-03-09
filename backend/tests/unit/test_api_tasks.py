@@ -338,6 +338,145 @@ class TestCardAPI:
 
         app.dependency_overrides.clear()
 
+    async def test_update_card(self, db_session: AsyncSession, sample_list, sample_card):
+        """Test updating a card via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.put(
+                f"/api/cards/{sample_card.id}",
+                json={"title": "Updated Title", "priority": "high"}
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["title"] == "Updated Title"
+        assert data["priority"] == "high"
+
+        app.dependency_overrides.clear()
+
+    async def test_update_nonexistent_card(self, db_session: AsyncSession):
+        """Test updating a card that doesn't exist"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        fake_id = uuid.uuid4()
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.put(
+                f"/api/cards/{fake_id}",
+                json={"title": "Should Fail"}
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+        app.dependency_overrides.clear()
+
+    async def test_get_board_cards(self, db_session: AsyncSession, sample_board, sample_list):
+        """Test getting all cards for a board via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        await TaskService.create_card(db_session, sample_list.id, "Card A")
+        await TaskService.create_card(db_session, sample_list.id, "Card B")
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/api/boards/{sample_board.id}/cards")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+
+        app.dependency_overrides.clear()
+
+    async def test_get_board_cards_with_priority_filter(self, db_session: AsyncSession, sample_board, sample_list):
+        """Test filtering board cards by priority via API"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+        from app.models.task import CardPriority
+
+        await TaskService.create_card(db_session, sample_list.id, "Low Card", priority=CardPriority.LOW)
+        await TaskService.create_card(db_session, sample_list.id, "Critical Card", priority=CardPriority.CRITICAL)
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/api/boards/{sample_board.id}/cards?priority=critical")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["priority"] == "critical"
+
+        app.dependency_overrides.clear()
+
+    async def test_get_board_cards_invalid_priority(self, db_session: AsyncSession, sample_board):
+        """Test that invalid priority value returns 422"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(f"/api/boards/{sample_board.id}/cards?priority=invalid")
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        app.dependency_overrides.clear()
+
+    async def test_create_card_with_priority(self, db_session: AsyncSession, sample_list):
+        """Test creating a card with explicit priority"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                f"/api/lists/{sample_list.id}/cards",
+                json={"title": "Critical Task", "priority": "critical", "position": 0}
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["priority"] == "critical"
+
+        app.dependency_overrides.clear()
+
+    async def test_create_card_default_priority(self, db_session: AsyncSession, sample_list):
+        """Test that card defaults to medium priority"""
+        from app.utils.database import get_db
+        from app.utils.auth import get_current_active_user
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                f"/api/lists/{sample_list.id}/cards",
+                json={"title": "Default Priority Card", "position": 0}
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["priority"] == "medium"
+
+        app.dependency_overrides.clear()
+
 
 @pytest.mark.asyncio
 class TestActivityAPI:

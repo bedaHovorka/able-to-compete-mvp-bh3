@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, delete, func
 from sqlalchemy.orm import selectinload
 from app.models import Board, List, Card, Activity, Label, Comment
-from app.models.task import card_labels
+from app.models.task import card_labels, CardPriority
 from app.utils.logger import logger
 from typing import Optional, List as ListType, Union
 from datetime import datetime
@@ -122,7 +122,7 @@ class TaskService:
         return list_obj
 
     @staticmethod
-    async def create_card(db: AsyncSession, list_id: uuid.UUID, title: str, description: Optional[str] = None, position: int = 0) -> Optional[Card]:
+    async def create_card(db: AsyncSession, list_id: uuid.UUID, title: str, description: Optional[str] = None, position: int = 0, priority: CardPriority = CardPriority.MEDIUM) -> Optional[Card]:
         """Create a new card"""
         query = select(List).where(List.id == list_id)
         result = await db.execute(query)
@@ -131,7 +131,7 @@ class TaskService:
         if not list_obj:
             return None
 
-        card = Card(list_id=list_id, title=title, description=description, position=position)
+        card = Card(list_id=list_id, title=title, description=description, position=position, priority=priority)
         db.add(card)
         await db.commit()
 
@@ -166,6 +166,40 @@ class TaskService:
 
         logger.info(f"Moved card: {card_id} to list {new_list_id}")
         return card
+
+    @staticmethod
+    async def update_card(db: AsyncSession, card_id: uuid.UUID, data) -> Optional[Card]:
+        """Update card fields"""
+        query = select(Card).where(Card.id == card_id).options(selectinload(Card.labels))
+        result = await db.execute(query)
+        card = result.scalar_one_or_none()
+        if not card:
+            return None
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(card, field, value)
+        card.updated_at = datetime.utcnow()
+        await db.commit()
+        # Reload with labels eagerly loaded
+        card_query = select(Card).where(Card.id == card_id).options(selectinload(Card.labels))
+        result = await db.execute(card_query)
+        card = result.scalar_one()
+        logger.info(f"Updated card: {card_id}")
+        return card
+
+    @staticmethod
+    async def get_cards_for_board(db: AsyncSession, board_id: uuid.UUID, priority: Optional[CardPriority] = None) -> ListType[Card]:
+        """Get all cards for a board with optional priority filter"""
+        query = (
+            select(Card)
+            .join(List, Card.list_id == List.id)
+            .where(List.board_id == board_id)
+            .options(selectinload(Card.labels))
+        )
+        if priority is not None:
+            query = query.where(Card.priority == priority)
+        result = await db.execute(query)
+        return result.scalars().all()
 
     @staticmethod
     async def get_board_activity(db: AsyncSession, board_id: uuid.UUID, limit: int = 50) -> ListType[Activity]:
