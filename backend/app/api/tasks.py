@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
 from app.services import TaskService, CommentService, DeleteResult
+from app.models.task import CardPriority
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
@@ -48,6 +49,16 @@ class CardCreate(BaseModel):
     title: str
     description: Optional[str] = None
     position: int = 0
+    priority: CardPriority = CardPriority.MEDIUM
+
+
+class CardUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    position: Optional[int] = None
+    due_date: Optional[datetime] = None
+    completed: Optional[bool] = None
+    priority: Optional[CardPriority] = None
 
 
 class CardMove(BaseModel):
@@ -76,6 +87,7 @@ class CardResponse(BaseModel):
     description: Optional[str]
     position: int
     completed: bool
+    priority: CardPriority
     created_at: datetime
     updated_at: datetime
     labels: List[LabelResponse] = []

@@ -1,8 +1,17 @@
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Uuid, Table, UniqueConstraint
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import enum
 import uuid
 from app.utils.database import Base
+
+
+class CardPriority(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
 
 # Association table for many-to-many between cards and labels
@@ -54,6 +63,11 @@ class Card(Base):
     position = Column(Integer, nullable=False, default=0)
     due_date = Column(DateTime, nullable=True)
     completed = Column(Boolean, default=False)
+    priority = Column(
+        SQLEnum("low", "medium", "high", "critical", name="cardpriority"),
+        nullable=False,
+        server_default="medium"
+    )
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
