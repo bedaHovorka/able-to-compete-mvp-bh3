@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from app.models import Monitor, Check, Incident, MonitorStatus, IncidentStatus, IncidentSeverity
 from app.utils.logger import logger
 from app.utils.database import AsyncSessionLocal
@@ -39,6 +39,30 @@ class MonitorService:
         query = select(Monitor).where(Monitor.id == monitor_id)
         result = await db.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_response_time_history(
+        self,
+        db: AsyncSession,
+        monitor_id: uuid.UUID,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[ListType[Check], int]:
+        """Returns (checks ordered by checked_at DESC, total_count)"""
+        count_query = select(func.count()).select_from(Check).where(Check.monitor_id == monitor_id)
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+
+        query = (
+            select(Check)
+            .where(Check.monitor_id == monitor_id)
+            .order_by(Check.checked_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        checks = result.scalars().all()
+
+        return checks, total
 
     async def execute_check(self, db: AsyncSession, monitor: Monitor) -> Check:
         """Execute a single health check"""

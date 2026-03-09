@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Float, Enum as SQLEnum, Uuid, JSON
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Float, Enum as SQLEnum, Uuid, JSON, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -44,6 +44,9 @@ class Monitor(Base):
 
 class Check(Base):
     __tablename__ = "checks"
+    __table_args__ = (
+        Index("ix_check_monitor_checked_at", "monitor_id", "checked_at"),
+    )
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     monitor_id = Column(Uuid(as_uuid=True), ForeignKey("monitors.id"), nullable=False, index=True)
