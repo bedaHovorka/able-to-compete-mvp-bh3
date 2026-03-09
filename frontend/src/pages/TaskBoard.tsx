@@ -115,7 +115,7 @@ export default function TaskBoard() {
               </Col>
             )}
 
-            {boardsList?.map((board: any) => (
+            {boardsList?.map((board) => (
               <Col key={board.id} xs={12} sm={6} lg={4}>
                 <Card
                   className="h-100 shadow-sm-hover"
@@ -172,7 +172,7 @@ export default function TaskBoard() {
 
           {/* Lists (Kanban Columns) */}
           <div className="d-flex gap-3 overflow-auto pb-4" style={{ minHeight: '500px' }}>
-            {boardDetail?.lists?.map((list: any) => (
+            {boardDetail?.lists?.map((list) => (
               <Card
                 key={list.id}
                 className="flex-shrink-0 bg-light border-0"
@@ -184,7 +184,7 @@ export default function TaskBoard() {
                 </Card.Header>
                 <Card.Body className="overflow-auto">
                   <div className="d-flex flex-column gap-2">
-                    {list.cards?.map((card: any) => (
+                    {list.cards?.map((card) => (
                       <Card
                         key={card.id}
                         className="shadow-sm"

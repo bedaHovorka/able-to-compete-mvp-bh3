@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
+import type { Board, List, Card, Monitor, StatusData } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -34,44 +35,44 @@ export default api
 // API functions
 export const auth = {
   login: (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
+    api.post<{ access_token: string }>('/auth/login', { email, password }),
   register: (email: string, password: string) =>
     api.post('/auth/register', { email, password }),
 }
 
 export const boards = {
-  list: () => api.get('/boards'),
-  get: (id: string) => api.get(`/boards/${id}`),
+  list: () => api.get<Board[]>('/boards'),
+  get: (id: string) => api.get<Board>(`/boards/${id}`),
   create: (data: { name: string; description?: string }) =>
-    api.post('/boards', data),
+    api.post<Board>('/boards', data),
   update: (id: string, data: { name: string; description?: string }) =>
-    api.put(`/boards/${id}`, data),
+    api.put<Board>(`/boards/${id}`, data),
   delete: (id: string) => api.delete(`/boards/${id}`),
 }
 
 export const lists = {
   create: (boardId: string, data: { name: string; position: number }) =>
-    api.post(`/boards/${boardId}/lists`, data),
+    api.post<List>(`/boards/${boardId}/lists`, data),
 }
 
 export const cards = {
   create: (listId: string, data: { title: string; description?: string }) =>
-    api.post(`/lists/${listId}/cards`, data),
+    api.post<Card>(`/lists/${listId}/cards`, data),
   move: (cardId: string, data: { list_id: string; position: number }) =>
-    api.put(`/cards/${cardId}/move`, data),
+    api.put<Card>(`/cards/${cardId}/move`, data),
 }
 
 export const monitors = {
-  list: () => api.get('/monitors'),
-  get: (id: string) => api.get(`/monitors/${id}`),
+  list: () => api.get<Monitor[]>('/monitors'),
+  get: (id: string) => api.get<Monitor>(`/monitors/${id}`),
   create: (data: { name: string; url: string; interval?: number }) =>
-    api.post('/monitors', data),
+    api.post<Monitor>('/monitors', data),
   uptime: (id: string, hours: number = 24) =>
-    api.get(`/monitors/${id}/uptime`, { params: { hours } }),
-  check: (id: string) => api.post(`/monitors/${id}/check`),
+    api.get<{ uptime: number }>(`/monitors/${id}/uptime`, { params: { hours } }),
+  check: (id: string) => api.post<Monitor>(`/monitors/${id}/check`),
 }
 
 export const dashboard = {
   metrics: () => api.get('/metrics/dashboard'),
-  statusPage: () => api.get('/status-page'),
+  statusPage: () => api.get<StatusData>('/status-page'),
 }

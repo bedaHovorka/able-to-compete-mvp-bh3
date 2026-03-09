@@ -25,10 +25,10 @@ export default function StatusPage() {
 
   const getOverallStatus = () => {
     const monitors = statusData?.monitors || []
-    if (monitors.some((m: any) => m.status === 'down')) {
+    if (monitors.some((m) => m.status === 'down')) {
       return { text: 'Service Disruption', color: 'text-red-600', bg: 'bg-red-100' }
     }
-    if (monitors.some((m: any) => m.status === 'degraded')) {
+    if (monitors.some((m) => m.status === 'degraded')) {
       return { text: 'Partial Outage', color: 'text-yellow-600', bg: 'bg-yellow-100' }
     }
     return { text: 'All Systems Operational', color: 'text-green-600', bg: 'bg-green-100' }
@@ -61,7 +61,7 @@ export default function StatusPage() {
           </div>
 
           <div className="divide-y divide-gray-200">
-            {statusData?.monitors?.map((monitor: any) => (
+            {statusData?.monitors?.map((monitor) => (
               <div key={monitor.name} className="px-6 py-4 hover:bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center flex-1">

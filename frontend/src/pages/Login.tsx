@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 import { auth } from '../lib/api'
 import { Sparkles, Lock, Mail, ArrowRight, Zap, AlertCircle } from 'lucide-react'
@@ -24,8 +25,12 @@ export default function Login() {
 
       setAuth(access_token, { email, id: 'demo-user-id' })
       navigate('/')
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed')
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || 'Login failed')
+      } else {
+        setError('Login failed')
+      }
     } finally {
       setLoading(false)
     }
