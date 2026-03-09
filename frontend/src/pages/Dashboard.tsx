@@ -1,14 +1,60 @@
-import { useQuery } from '@tanstack/react-query'
-import { Activity, TrendingUp, AlertCircle, CheckCircle2, Plus, Eye, Zap, ArrowRight } from 'lucide-react'
-import { dashboard } from '../lib/api'
+import { useQuery, useQueries } from '@tanstack/react-query'
+import { formatDistanceToNow } from 'date-fns'
+import { Activity, TrendingUp, AlertCircle, CheckCircle2, Plus, Eye, Zap, ArrowRight, type LucideIcon } from 'lucide-react'
+import { dashboard, boards as boardsApi } from '../lib/api'
 import { Link } from 'react-router-dom'
-import { Row, Col, Card, Button, Alert, Badge } from 'react-bootstrap'
+import { Row, Col, Card, Alert, Badge, Placeholder } from 'react-bootstrap'
+import type { ActivityEntry } from '../types'
+
+function getActivityMeta(entry: ActivityEntry): {
+  icon: LucideIcon
+  bgClass: string
+  iconClass: string
+} {
+  const { action, entity_type } = entry
+  if (action === 'board_created') {
+    return { icon: Plus, bgClass: 'bg-primary', iconClass: 'text-primary' }
+  }
+  if (action === 'card_created') {
+    return { icon: Activity, bgClass: 'bg-primary', iconClass: 'text-primary' }
+  }
+  if (action === 'card_moved') {
+    return { icon: ArrowRight, bgClass: 'bg-warning', iconClass: 'text-warning' }
+  }
+  if (entity_type === 'monitor') {
+    if (action.includes('down')) {
+      return { icon: AlertCircle, bgClass: 'bg-danger', iconClass: 'text-danger' }
+    }
+    return { icon: CheckCircle2, bgClass: 'bg-success', iconClass: 'text-success' }
+  }
+  return { icon: Activity, bgClass: 'bg-secondary', iconClass: 'text-secondary' }
+}
 
 export default function Dashboard() {
   const { data: metrics } = useQuery({
     queryKey: ['dashboard-metrics'],
     queryFn: () => dashboard.metrics().then((res) => res.data),
   })
+
+  const { data: boardsList, isLoading: boardsLoading, isError: boardsError } = useQuery({
+    queryKey: ['boards'],
+    queryFn: () => boardsApi.list().then((res) => res.data),
+  })
+
+  const activityQueries = useQueries({
+    queries: (boardsList ?? []).map((board) => ({
+      queryKey: ['activity', board.id],
+      queryFn: () => boardsApi.activity(board.id).then((r) => r.data),
+      enabled: !!board.id,
+    })),
+  })
+
+  const activityLoading = boardsLoading || activityQueries.some((q) => q.isLoading)
+
+  const allActivity: ActivityEntry[] = activityQueries
+    .flatMap((q) => q.data ?? [])
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 5)
 
   const stats = [
     {
@@ -147,40 +193,57 @@ export default function Dashboard() {
               <h5 className="mb-0 fw-bold">Recent Activity</h5>
             </Card.Header>
             <Card.Body>
-              <div className="d-flex align-items-start mb-3">
-                <div className="bg-success bg-opacity-10 rounded-circle p-2 me-3">
-                  <CheckCircle2 className="text-success" size={20} />
+              {boardsError ? (
+                <div className="text-center text-muted py-4">
+                  <AlertCircle size={40} className="mb-2 text-danger opacity-75" />
+                  <p className="mb-0">Failed to load activity. Please try again later.</p>
                 </div>
-                <div className="flex-grow-1">
-                  <h6 className="mb-1">Monitor "Production API" is back online</h6>
-                  <small className="text-muted">2 minutes ago</small>
+              ) : activityLoading ? (
+                <>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="d-flex align-items-start mb-3">
+                      <Placeholder as="div" animation="glow" className="me-3">
+                        <Placeholder style={{ width: 40, height: 40, borderRadius: '50%' }} />
+                      </Placeholder>
+                      <div className="flex-grow-1">
+                        <Placeholder as="p" animation="glow" className="mb-1">
+                          <Placeholder xs={8} />
+                        </Placeholder>
+                        <Placeholder as="p" animation="glow" className="mb-0">
+                          <Placeholder xs={4} size="sm" />
+                        </Placeholder>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : allActivity.length === 0 ? (
+                <div className="text-center text-muted py-4">
+                  <Activity size={40} className="mb-2 opacity-50" />
+                  <p className="mb-0">No activity yet. Create a board or add a monitor to get started.</p>
                 </div>
-              </div>
-
-              <div className="d-flex align-items-start mb-3">
-                <div className="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                  <Activity className="text-primary" size={20} />
-                </div>
-                <div className="flex-grow-1">
-                  <h6 className="mb-1">New board created: "Sprint Planning"</h6>
-                  <small className="text-muted">15 minutes ago</small>
-                </div>
-              </div>
-
-              <div className="d-flex align-items-start">
-                <div className="bg-danger bg-opacity-10 rounded-circle p-2 me-3">
-                  <AlertCircle className="text-danger" size={20} />
-                </div>
-                <div className="flex-grow-1">
-                  <h6 className="mb-1">Monitor "Database Server" is down</h6>
-                  <small className="text-muted">1 hour ago</small>
-                </div>
-              </div>
+              ) : (
+                allActivity.map((entry, index) => {
+                  const { icon: Icon, bgClass, iconClass } = getActivityMeta(entry)
+                  return (
+                    <div key={entry.id} className={`d-flex align-items-start${index < allActivity.length - 1 ? ' mb-3' : ''}`}>
+                      <div className={`${bgClass} bg-opacity-10 rounded-circle p-2 me-3 flex-shrink-0`}>
+                        <Icon className={iconClass} size={20} />
+                      </div>
+                      <div className="flex-grow-1">
+                        <h6 className="mb-1">{entry.details}</h6>
+                        <small className="text-muted">
+                          {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
+                        </small>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
 
               <div className="text-center mt-3">
-                <Button variant="outline-primary" size="sm">
+                <Link to="/tasks" className="btn btn-outline-primary btn-sm">
                   View All Activity <ArrowRight size={16} className="ms-1" />
-                </Button>
+                </Link>
               </div>
             </Card.Body>
           </Card>
