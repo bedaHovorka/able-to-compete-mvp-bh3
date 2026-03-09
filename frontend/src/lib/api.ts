@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
-import type { Board, List, Card, Monitor, StatusData, ActivityEntry } from '../types'
+import type { Board, List, Card, Monitor, StatusData, ActivityEntry, Incident, AnalysisResult } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -101,6 +101,15 @@ export interface DevResponse {
   code_type: string
   specification: string
   language: string
+}
+
+export const incidents = {
+  list: (monitorId?: string) =>
+    api.get<Incident[]>('/incidents', monitorId ? { params: { monitor_id: monitorId } } : undefined),
+  analyzeWithAI: (incidentId: string, analysisType: string) =>
+    api.post<AnalysisResult>('/ai/analyze-incident', null, {
+      params: { incident_id: incidentId, analysis_type: analysisType },
+    }),
 }
 
 export const agents = {

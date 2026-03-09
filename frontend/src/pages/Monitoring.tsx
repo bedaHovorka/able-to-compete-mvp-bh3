@@ -1,10 +1,27 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Activity, CheckCircle, XCircle, AlertTriangle, Wifi } from 'lucide-react'
-import { monitors } from '../lib/api'
+import { Plus, Activity, CheckCircle, XCircle, AlertTriangle, Brain, ChevronDown, ChevronUp, Wifi } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import { monitors, incidents } from '../lib/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { WsMessage } from '../hooks/useWebSocket'
-import type { Monitor } from '../types'
+import type { Incident, AnalysisResult, Monitor } from '../types'
+
+type AnalysisType = 'general' | 'root_cause' | 'pattern'
+
+interface IncidentAnalysisState {
+  analysisType: AnalysisType
+  result: AnalysisResult | null
+  error: string | null
+  isPending: boolean
+}
+
+const DEFAULT_ANALYSIS_STATE: IncidentAnalysisState = {
+  analysisType: 'general',
+  result: null,
+  error: null,
+  isPending: false,
+}
 
 interface UptimeData {
   uptime_percentage: number
@@ -69,6 +86,8 @@ export default function Monitoring() {
   const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval: 60 })
   const [incidentBanner, setIncidentBanner] = useState<string | null>(null)
   const [uptimeHours, setUptimeHours] = useState(24)
+  const [expandedIncidents, setExpandedIncidents] = useState<Record<string, boolean>>({})
+  const [incidentAnalysis, setIncidentAnalysis] = useState<Record<string, IncidentAnalysisState>>({})
 
   const handleWsMessage = useCallback(
     (msg: WsMessage) => {
@@ -101,6 +120,11 @@ export default function Monitoring() {
   const { data: monitorsList } = useQuery({
     queryKey: ['monitors'],
     queryFn: () => monitors.list().then((res) => res.data),
+  })
+
+  const { data: incidentsList } = useQuery({
+    queryKey: ['incidents'],
+    queryFn: () => incidents.list().then((res: { data: Incident[] }) => res.data),
   })
 
   const createMonitorMutation = useMutation({
@@ -147,6 +171,72 @@ export default function Monitoring() {
       paused: 'bg-gray-100 text-gray-800',
     }
     return styles[status as keyof typeof styles] || styles.paused
+  }
+
+  const getSeverityBadge = (severity: string) => {
+    const styles: Record<string, string> = {
+      critical: 'bg-red-100 text-red-800',
+      high: 'bg-orange-100 text-orange-800',
+      medium: 'bg-yellow-100 text-yellow-800',
+      low: 'bg-blue-100 text-blue-800',
+    }
+    return styles[severity] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getIncidentStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      investigating: 'bg-red-100 text-red-800',
+      identified: 'bg-orange-100 text-orange-800',
+      monitoring: 'bg-yellow-100 text-yellow-800',
+      resolved: 'bg-green-100 text-green-800',
+    }
+    return styles[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getConfidenceBadge = (confidence: number) => {
+    if (confidence >= 0.8) return 'bg-green-100 text-green-800'
+    if (confidence >= 0.6) return 'bg-yellow-100 text-yellow-800'
+    return 'bg-red-100 text-red-800'
+  }
+
+  const handleAnalyzeIncident = async (incidentId: string) => {
+    const state = incidentAnalysis[incidentId] ?? DEFAULT_ANALYSIS_STATE
+    setIncidentAnalysis((prev) => ({
+      ...prev,
+      [incidentId]: { ...state, isPending: true, error: null, result: null },
+    }))
+    try {
+      const res = await incidents.analyzeWithAI(incidentId, state.analysisType)
+      setIncidentAnalysis((prev) => ({
+        ...prev,
+        [incidentId]: { ...prev[incidentId], isPending: false, result: res.data },
+      }))
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Analysis failed. Please try again.'
+      setIncidentAnalysis((prev) => ({
+        ...prev,
+        [incidentId]: {
+          ...prev[incidentId],
+          isPending: false,
+          error: message,
+        },
+      }))
+    }
+  }
+
+  const setAnalysisType = (incidentId: string, type: AnalysisType) => {
+    setIncidentAnalysis((prev) => ({
+      ...prev,
+      [incidentId]: {
+        ...(prev[incidentId] ?? DEFAULT_ANALYSIS_STATE),
+        analysisType: type,
+      },
+    }))
+  }
+
+  const toggleIncidentExpanded = (incidentId: string) => {
+    setExpandedIncidents((prev) => ({ ...prev, [incidentId]: !prev[incidentId] }))
   }
 
   return (
@@ -324,6 +414,109 @@ export default function Monitoring() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Incidents Section */}
+      <div className="space-y-2">
+        <h2 className="text-xl font-semibold text-gray-900">Incidents</h2>
+        {!incidentsList || incidentsList.length === 0 ? (
+          <div className="bg-white shadow rounded-lg p-6 text-center text-gray-500">
+            No incidents found.
+          </div>
+        ) : (
+          <div className="bg-white shadow rounded-lg divide-y divide-gray-200">
+            {incidentsList.map((incident: Incident) => {
+              const analysisState = incidentAnalysis[incident.id] ?? DEFAULT_ANALYSIS_STATE
+              const isExpanded = !!expandedIncidents[incident.id]
+
+              return (
+                <div key={incident.id} className="p-4">
+                  {/* Incident header row */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <button
+                        onClick={() => toggleIncidentExpanded(incident.id)}
+                        className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
+                      <span className="text-sm font-medium text-gray-900 truncate">
+                        {incident.title}
+                      </span>
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${getSeverityBadge(incident.severity)}`}>
+                        {incident.severity}
+                      </span>
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${getIncidentStatusBadge(incident.status)}`}>
+                        {incident.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        value={analysisState.analysisType}
+                        onChange={(e) => setAnalysisType(incident.id, e.target.value as AnalysisType)}
+                        className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:border-primary-500 focus:ring-primary-500"
+                      >
+                        <option value="general">General</option>
+                        <option value="root_cause">Root Cause</option>
+                        <option value="pattern">Pattern</option>
+                      </select>
+                      <button
+                        onClick={() => handleAnalyzeIncident(incident.id)}
+                        disabled={analysisState.isPending}
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        <Brain className="w-4 h-4 mr-1" />
+                        {analysisState.isPending ? 'Analyzing…' : 'Analyze with AI'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded incident details */}
+                  {isExpanded && (
+                    <div className="mt-2 pl-6 text-sm text-gray-600 space-y-1">
+                      {incident.description && <p>{incident.description}</p>}
+                      <p className="text-xs text-gray-400">
+                        Started: {new Date(incident.started_at).toLocaleString()}
+                        {incident.resolved_at && (
+                          <> · Resolved: {new Date(incident.resolved_at).toLocaleString()}</>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Analysis result panel */}
+                  {analysisState.error && (
+                    <div className="mt-3 pl-6">
+                      <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">
+                        {analysisState.error}
+                      </div>
+                    </div>
+                  )}
+                  {analysisState.result && (
+                    <div className="mt-3 pl-6">
+                      <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-gray-700">AI Analysis</span>
+                          <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getConfidenceBadge(analysisState.result.confidence)}`}>
+                            Confidence: {Math.round(analysisState.result.confidence * 100)}%
+                          </span>
+                        </div>
+                        <div className="prose prose-sm max-w-none text-gray-800">
+                          <ReactMarkdown>{analysisState.result.analysis}</ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

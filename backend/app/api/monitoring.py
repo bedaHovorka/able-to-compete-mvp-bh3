@@ -73,6 +73,22 @@ class DashboardMetrics(BaseModel):
     avg_uptime: float
 
 
+class IncidentResponse(BaseModel):
+    id: uuid.UUID
+    monitor_id: uuid.UUID
+    title: str
+    description: Optional[str]
+    status: str
+    severity: str
+    started_at: datetime
+    resolved_at: Optional[datetime]
+    acknowledged_at: Optional[datetime]
+    acknowledged_by: Optional[uuid.UUID]
+
+    class Config:
+        from_attributes = True
+
+
 async def _get_ssl_expiry_days(db: AsyncSession, monitor_id: uuid.UUID) -> Optional[int]:
     """Return ssl_expiry_days from the latest check for an SSL monitor, or None."""
     query = (
@@ -299,6 +315,25 @@ async def get_dashboard_metrics(
         active_incidents=active_incidents,
         avg_uptime=round(avg_uptime, 2)
     )
+
+
+# Incidents endpoints
+@router.get("/incidents", response_model=List[IncidentResponse])
+async def list_incidents(
+    monitor_id: Optional[uuid.UUID] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """List incidents, optionally filtered by monitor"""
+    from app.models import Incident
+    query = select(Incident)
+    if monitor_id:
+        query = query.where(Incident.monitor_id == monitor_id)
+    query = query.order_by(Incident.started_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
 
 
 # AI-powered analysis
