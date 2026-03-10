@@ -283,14 +283,22 @@ async def get_dashboard_metrics(
 ):
     """Get dashboard metrics"""
     from sqlalchemy import select, func
-    from app.models import Incident, MonitorStatus, IncidentStatus
+    from app.models import Monitor, Incident, MonitorStatus, IncidentStatus
 
-    # Count monitors by status
+    # Count monitors by status via DB aggregation
+    status_result = await db.execute(
+        select(Monitor.status, func.count(Monitor.id).label("count"))
+        .group_by(Monitor.status)
+    )
+    status_counts = {row.status: row.count for row in status_result}
+
+    monitors_up = status_counts.get(MonitorStatus.UP, 0)
+    monitors_down = status_counts.get(MonitorStatus.DOWN, 0)
+    monitors_degraded = status_counts.get(MonitorStatus.DEGRADED, 0)
+    total_monitors = sum(status_counts.values())
+
+    # Still fetch monitors for per-monitor uptime calculation
     monitors = await monitor_service.get_monitors(db)
-    total_monitors = len(monitors)
-    monitors_up = sum(1 for m in monitors if m.status == MonitorStatus.UP)
-    monitors_down = sum(1 for m in monitors if m.status == MonitorStatus.DOWN)
-    monitors_degraded = sum(1 for m in monitors if m.status == MonitorStatus.DEGRADED)
 
     # Count active incidents
     query = select(func.count()).select_from(Incident).where(
