@@ -12,7 +12,7 @@ Feature: Service Monitoring
 
   Scenario: Detect service downtime
     Given I have an active monitor
-    When the endpoint returns status code 500
+    When the endpoint becomes unreachable
     Then an incident should be created
     And an alert should be sent
     And the status page should show "DOWN"

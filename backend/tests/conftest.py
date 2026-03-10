@@ -116,6 +116,7 @@ def client(session_factory):
         """Skip production DB setup — tables already created by engine fixture."""
         yield
 
+    original_lifespan = app.router.lifespan_context
     app.router.lifespan_context = noop_lifespan
 
     async def _override_get_db():
@@ -124,10 +125,12 @@ def client(session_factory):
 
     app.dependency_overrides[get_db] = _override_get_db
 
-    with TestClient(app=app, base_url="http://test", raise_server_exceptions=True) as tc:
-        yield tc
-
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app=app, base_url="http://test", raise_server_exceptions=True) as tc:
+            yield tc
+    finally:
+        app.dependency_overrides.clear()
+        app.router.lifespan_context = original_lifespan
 
 
 # ── Auth helper ───────────────────────────────────────────────────────────────

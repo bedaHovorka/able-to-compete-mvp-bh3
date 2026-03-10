@@ -23,8 +23,8 @@ def create_board(client, scenario_headers, board_name):
     return r.json()
 
 
-@then("the board should be created with default lists")
-def verify_board_lists(client, scenario_headers, created_board):
+@then("the board should be created successfully")
+def verify_board_created(client, scenario_headers, created_board):
     r = client.get(f"/api/boards/{created_board['id']}", headers=scenario_headers)
     assert r.status_code == 200
     data = r.json()
@@ -100,23 +100,32 @@ def card_in_todo(client, headers):
         json={"name": "Move Test Board", "description": ""},
         headers=headers,
     )
+    assert br.status_code == 201, br.text
     board_id = br.json()["id"]
 
-    todo = client.post(
+    todo_r = client.post(
         f"/api/boards/{board_id}/lists",
         json={"name": "To Do", "position": 0},
         headers=headers,
-    ).json()
-    inprog = client.post(
+    )
+    assert todo_r.status_code == 201, todo_r.text
+    todo = todo_r.json()
+
+    inprog_r = client.post(
         f"/api/boards/{board_id}/lists",
         json={"name": "In Progress", "position": 1},
         headers=headers,
-    ).json()
-    card = client.post(
+    )
+    assert inprog_r.status_code == 201, inprog_r.text
+    inprog = inprog_r.json()
+
+    card_r = client.post(
         f"/api/lists/{todo['id']}/cards",
         json={"title": "Moveable Card", "description": "", "position": 0},
         headers=headers,
-    ).json()
+    )
+    assert card_r.status_code == 201, card_r.text
+    card = card_r.json()
 
     return {"card": card, "todo": todo, "inprog": inprog, "board_id": board_id}
 

@@ -31,7 +31,8 @@ def open_incident_for_failing_monitor(client, headers):
         side_effect=Exception("Connection refused"),
     ):
         for _ in range(3):
-            client.post(f"/api/monitors/{monitor_id}/check", headers=headers)
+            r = client.post(f"/api/monitors/{monitor_id}/check", headers=headers)
+            assert r.status_code == 200, r.text
 
     # 3. Retrieve the created incident
     r = client.get(f"/api/incidents?monitor_id={monitor_id}", headers=headers)

@@ -49,7 +49,7 @@ class UptimeResponse(BaseModel):
     uptime_percentage: float
     total_checks: int
     failed_checks: int
-    avg_response_time: float
+    avg_response_time: Optional[float]
 
 
 class ResponseTimePoint(BaseModel):

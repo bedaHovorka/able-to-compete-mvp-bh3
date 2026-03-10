@@ -302,7 +302,7 @@ class MonitorService:
         failed_checks = total_checks - up_checks
         uptime_percentage = (up_checks / total_checks) * 100
 
-        timed_checks = [c for c in checks if c.response_time]
+        timed_checks = [c for c in checks if c.response_time is not None]
         avg_response_time = sum(c.response_time for c in timed_checks) / len(timed_checks) if timed_checks else None
 
         return {

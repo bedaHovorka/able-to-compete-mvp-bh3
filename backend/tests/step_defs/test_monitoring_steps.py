@@ -1,5 +1,4 @@
 """BDD steps for monitoring.feature — all step functions are sync (TestClient)."""
-import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from pytest_bdd import scenarios, given, when, then, parsers
 
@@ -58,8 +57,8 @@ def active_monitor_fixture(client, headers):
     return r.json()
 
 
-@when("the endpoint returns status code 500")
-def endpoint_returns_500(client, headers, active_monitor):
+@when("the endpoint becomes unreachable")
+def endpoint_becomes_unreachable(client, headers, active_monitor):
     monitor_id = active_monitor["id"]
     with patch(
         "httpx.AsyncClient.get",

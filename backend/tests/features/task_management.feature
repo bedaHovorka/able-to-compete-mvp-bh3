@@ -7,7 +7,7 @@ Feature: Task Management System
   Scenario: Create a new board
     Given I am an authenticated user
     When I create a board named "MVP Development"
-    Then the board should be created with default lists
+    Then the board should be created successfully
     And an audit log entry should be created
 
   Scenario: Add a card to a list
