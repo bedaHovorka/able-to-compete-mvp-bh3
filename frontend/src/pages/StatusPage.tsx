@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react'
 import { dashboard } from '../lib/api'
+import { getStatusIcon, getStatusBadgeClass } from '../lib/statusUtils'
 import { format } from 'date-fns'
 
 export default function StatusPage() {
@@ -9,19 +9,6 @@ export default function StatusPage() {
     queryFn: () => dashboard.statusPage().then((res) => res.data),
     refetchInterval: 30000, // Refetch every 30 seconds
   })
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'up':
-        return <CheckCircle className="w-6 h-6 text-green-500" />
-      case 'down':
-        return <XCircle className="w-6 h-6 text-red-500" />
-      case 'degraded':
-        return <AlertTriangle className="w-6 h-6 text-yellow-500" />
-      default:
-        return <Clock className="w-6 h-6 text-gray-400" />
-    }
-  }
 
   const getOverallStatus = () => {
     const monitors = statusData?.monitors || []
@@ -65,7 +52,7 @@ export default function StatusPage() {
               <div key={monitor.name} className="px-6 py-4 hover:bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center flex-1">
-                    {getStatusIcon(monitor.status)}
+                    {getStatusIcon(monitor.status, 'w-6 h-6')}
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900">
                         {monitor.name}
@@ -76,11 +63,7 @@ export default function StatusPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      monitor.status === 'up' ? 'bg-green-100 text-green-800' :
-                      monitor.status === 'down' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(monitor.status)}`}>
                       {monitor.status.toUpperCase()}
                     </span>
                   </div>
