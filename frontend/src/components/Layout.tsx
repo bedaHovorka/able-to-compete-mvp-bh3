@@ -6,7 +6,8 @@ import { Navbar, Container, Nav, NavDropdown } from 'react-bootstrap'
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuthStore()
+  const user = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
 
   const handleLogout = () => {
     logout()

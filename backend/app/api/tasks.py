@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
-from app.services import TaskService, CommentService, DeleteResult
+from app.services import TaskService, CommentService, DeleteResult, AddLabelResult
 from app.models.task import CardPriority
 from app.api.websocket import broadcast_update
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,9 +25,7 @@ class BoardResponse(BaseModel):
     description: Optional[str]
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ListCreate(BaseModel):
@@ -41,9 +39,7 @@ class ListResponse(BaseModel):
     name: str
     position: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CardCreate(BaseModel):
@@ -92,9 +88,7 @@ class CardResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     labels: List[LabelResponse] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ListWithCardsResponse(BaseModel):
@@ -104,9 +98,7 @@ class ListWithCardsResponse(BaseModel):
     position: int
     created_at: datetime
     cards: List[CardResponse] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BoardWithListsResponse(BaseModel):
@@ -116,9 +108,7 @@ class BoardWithListsResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     lists: List[ListWithCardsResponse] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ActivityResponse(BaseModel):
@@ -128,9 +118,7 @@ class ActivityResponse(BaseModel):
     entity_id: uuid.UUID
     details: Optional[str]
     timestamp: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommentCreate(BaseModel):
@@ -415,12 +403,12 @@ async def attach_label_to_card(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Card or label not found"
         )
-    if result == "cross_board":
+    if result == AddLabelResult.CROSS_BOARD:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Label does not belong to the same board as the card"
         )
-    if result == "duplicate":
+    if result == AddLabelResult.DUPLICATE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Label is already attached to this card"

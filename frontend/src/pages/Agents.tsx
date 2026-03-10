@@ -7,6 +7,29 @@ type SpecType = 'general' | 'user_story' | 'bdd'
 type TestType = 'unit' | 'integration' | 'bdd'
 type DevType = 'api' | 'service' | 'general' | 'model' | 'util'
 
+function createAgentHandler(
+  apiCall: () => Promise<string>,
+  setResult: (result: string) => void,
+  setLoading: (loading: boolean) => void,
+  setError: (error: string | null) => void,
+  errorMessage: string,
+  logLabel: string,
+) {
+  return async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await apiCall()
+      setResult(result)
+    } catch (err) {
+      console.error(logLabel, err)
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -51,50 +74,47 @@ export default function Agents() {
 
   const handleGenerateSpec = async () => {
     if (!requirements.trim()) return
-    setSpecLoading(true)
-    setSpecError(null)
-    try {
-      const res = await agents.spec({ requirements: requirements.trim(), type: specType })
-      const spec = res.data.specification
-      setSpecification(spec)
-      setTestSpec(spec)
-      setDevSpec(spec)
-    } catch (err) {
-      console.error('Spec agent error:', err)
-      setSpecError('Failed to generate specification. Please try again.')
-    } finally {
-      setSpecLoading(false)
-    }
+    await createAgentHandler(
+      async () => {
+        const res = await agents.spec({ requirements: requirements.trim(), type: specType })
+        return res.data.specification
+      },
+      (spec) => { setSpecification(spec); setTestSpec(spec); setDevSpec(spec) },
+      setSpecLoading,
+      setSpecError,
+      'Failed to generate specification. Please try again.',
+      'Spec agent error:',
+    )()
   }
 
   const handleGenerateTests = async () => {
     if (!testSpec.trim()) return
-    setTestLoading(true)
-    setTestError(null)
-    try {
-      const res = await agents.test({ specification: testSpec.trim(), type: testType })
-      setTestCode(res.data.test_code)
-    } catch (err) {
-      console.error('Test agent error:', err)
-      setTestError('Failed to generate tests. Please try again.')
-    } finally {
-      setTestLoading(false)
-    }
+    await createAgentHandler(
+      async () => {
+        const res = await agents.test({ specification: testSpec.trim(), type: testType })
+        return res.data.test_code
+      },
+      setTestCode,
+      setTestLoading,
+      setTestError,
+      'Failed to generate tests. Please try again.',
+      'Test agent error:',
+    )()
   }
 
   const handleGenerateCode = async () => {
     if (!devSpec.trim()) return
-    setDevLoading(true)
-    setDevError(null)
-    try {
-      const res = await agents.dev({ specification: devSpec.trim(), type: devType })
-      setDevCode(res.data.code)
-    } catch (err) {
-      console.error('Dev agent error:', err)
-      setDevError('Failed to generate code. Please try again.')
-    } finally {
-      setDevLoading(false)
-    }
+    await createAgentHandler(
+      async () => {
+        const res = await agents.dev({ specification: devSpec.trim(), type: devType })
+        return res.data.code
+      },
+      setDevCode,
+      setDevLoading,
+      setDevError,
+      'Failed to generate code. Please try again.',
+      'Dev agent error:',
+    )()
   }
 
   const handleRunPipeline = async () => {

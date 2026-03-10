@@ -24,11 +24,17 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict):
         message_str = json.dumps(message)
+        dead = []
         for connection in self.active_connections:
             try:
                 await connection.send_text(message_str)
             except Exception as e:
                 logger.error(f"Error broadcasting to websocket: {e}")
+                dead.append(connection)
+
+        # Remove dead connections
+        for connection in dead:
+            self.active_connections.remove(connection)
 
 manager = ConnectionManager()
 

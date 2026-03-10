@@ -71,6 +71,9 @@ export function useWebSocket(
       setConnected(false)
       wsRef.current = null
       if (!unmountedRef.current) {
+        if (reconnectTimerRef.current !== null) {
+          clearTimeout(reconnectTimerRef.current)
+        }
         reconnectTimerRef.current = setTimeout(() => {
           reconnectDelayRef.current = Math.min(
             reconnectDelayRef.current * 2,

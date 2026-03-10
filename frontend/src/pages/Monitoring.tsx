@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Activity, CheckCircle, XCircle, AlertTriangle, Brain, ChevronDown, ChevronUp, Wifi } from 'lucide-react'
+import { Plus, Brain, ChevronDown, ChevronUp, Wifi } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { monitors, incidents } from '../lib/api'
+import { getStatusIcon, getStatusBadgeClass } from '../lib/statusUtils'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { WsMessage } from '../hooks/useWebSocket'
 import type { Incident, AnalysisResult, Monitor } from '../types'
@@ -141,37 +142,14 @@ export default function Monitoring() {
 
   const triggerCheckMutation = useMutation({
     mutationFn: (id: string) => monitors.check(id),
-    onSuccess: () => {
+    onSuccess: (_, monitorId: string) => {
       queryClient.invalidateQueries({ queryKey: ['monitors'] })
-      queryClient.invalidateQueries({ queryKey: ['uptime'] })
+      queryClient.invalidateQueries({ queryKey: ['uptime', monitorId] })
     },
     onError: (error) => {
       console.error('Failed to trigger check:', error)
     },
   })
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'up':
-        return <CheckCircle className="w-5 h-5 text-green-500" />
-      case 'down':
-        return <XCircle className="w-5 h-5 text-red-500" />
-      case 'degraded':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />
-      default:
-        return <Activity className="w-5 h-5 text-gray-400" />
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      up: 'bg-green-100 text-green-800',
-      down: 'bg-red-100 text-red-800',
-      degraded: 'bg-yellow-100 text-yellow-800',
-      paused: 'bg-gray-100 text-gray-800',
-    }
-    return styles[status as keyof typeof styles] || styles.paused
-  }
 
   const getSeverityBadge = (severity: string) => {
     const styles: Record<string, string> = {
@@ -209,7 +187,7 @@ export default function Monitoring() {
       const res = await incidents.analyzeWithAI(incidentId, state.analysisType)
       setIncidentAnalysis((prev) => ({
         ...prev,
-        [incidentId]: { ...prev[incidentId], isPending: false, result: res.data },
+        [incidentId]: { ...(prev[incidentId] ?? DEFAULT_ANALYSIS_STATE), isPending: false, result: res.data },
       }))
     } catch (err) {
       const message =
@@ -217,7 +195,7 @@ export default function Monitoring() {
       setIncidentAnalysis((prev) => ({
         ...prev,
         [incidentId]: {
-          ...prev[incidentId],
+          ...(prev[incidentId] ?? DEFAULT_ANALYSIS_STATE),
           isPending: false,
           error: message,
         },
@@ -389,7 +367,7 @@ export default function Monitoring() {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(monitor.status)}`}>
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(monitor.status)}`}>
                     {monitor.status}
                   </span>
                 </td>
