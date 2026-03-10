@@ -142,9 +142,9 @@ export default function Monitoring() {
 
   const triggerCheckMutation = useMutation({
     mutationFn: (id: string) => monitors.check(id),
-    onSuccess: () => {
+    onSuccess: (_, monitorId: string) => {
       queryClient.invalidateQueries({ queryKey: ['monitors'] })
-      queryClient.invalidateQueries({ queryKey: ['uptime'] })
+      queryClient.invalidateQueries({ queryKey: ['uptime', monitorId] })
     },
     onError: (error) => {
       console.error('Failed to trigger check:', error)
