@@ -186,17 +186,20 @@ class MonitorService:
 
         return check
 
-    async def handle_ssl_incident(self, db: AsyncSession, monitor: Monitor, status: MonitorStatus, ssl_expiry_days: Optional[int]):
-        """Handle incident creation and resolution for SSL monitors (no 3-failure wait)."""
-        # Check for existing open incident
+    async def _get_open_incident(self, db: AsyncSession, monitor_id: uuid.UUID) -> Optional[Incident]:
+        """Return the open (investigating/identified) incident for a monitor, or None."""
         query = select(Incident).where(
             and_(
-                Incident.monitor_id == monitor.id,
+                Incident.monitor_id == monitor_id,
                 Incident.status.in_([IncidentStatus.INVESTIGATING, IncidentStatus.IDENTIFIED])
             )
         )
         result = await db.execute(query)
-        existing_incident = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
+
+    async def handle_ssl_incident(self, db: AsyncSession, monitor: Monitor, status: MonitorStatus, ssl_expiry_days: Optional[int]):
+        """Handle incident creation and resolution for SSL monitors (no 3-failure wait)."""
+        existing_incident = await self._get_open_incident(db, monitor.id)
 
         if status == MonitorStatus.DOWN:
             if not existing_incident:
@@ -245,15 +248,7 @@ class MonitorService:
         if monitor_id_str not in failure_counts:
             failure_counts[monitor_id_str] = 0
 
-        # Check for existing open incident
-        query = select(Incident).where(
-            and_(
-                Incident.monitor_id == monitor.id,
-                Incident.status.in_([IncidentStatus.INVESTIGATING, IncidentStatus.IDENTIFIED])
-            )
-        )
-        result = await db.execute(query)
-        existing_incident = result.scalar_one_or_none()
+        existing_incident = await self._get_open_incident(db, monitor.id)
 
         if status == MonitorStatus.DOWN:
             failure_counts[monitor_id_str] += 1
