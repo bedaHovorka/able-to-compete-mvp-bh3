@@ -23,6 +23,13 @@ class AddLabelResult(str, enum.Enum):
 
 class TaskService:
     @staticmethod
+    async def _load_card_with_labels(db: AsyncSession, card_id: uuid.UUID) -> Card:
+        result = await db.execute(
+            select(Card).options(selectinload(Card.labels)).where(Card.id == card_id)
+        )
+        return result.scalar_one()
+
+    @staticmethod
     async def create_board(db: AsyncSession, name: str, description: Optional[str] = None, user_id: Optional[uuid.UUID] = None) -> Board:
         """Create a new board"""
         board = Board(name=name, description=description, user_id=user_id)
@@ -141,9 +148,7 @@ class TaskService:
         await db.commit()
 
         # Reload with labels eagerly loaded
-        card_query = select(Card).where(Card.id == card.id).options(selectinload(Card.labels))
-        result = await db.execute(card_query)
-        card = result.scalar_one()
+        card = await TaskService._load_card_with_labels(db, card.id)
 
         logger.info(f"Created card: {card.id} in list {list_id}")
         return card
@@ -165,9 +170,7 @@ class TaskService:
         await db.commit()
 
         # Reload with labels eagerly loaded
-        card_query = select(Card).where(Card.id == card_id).options(selectinload(Card.labels))
-        result = await db.execute(card_query)
-        card = result.scalar_one()
+        card = await TaskService._load_card_with_labels(db, card_id)
 
         logger.info(f"Moved card: {card_id} to list {new_list_id}")
         return card
@@ -186,9 +189,7 @@ class TaskService:
         card.updated_at = datetime.utcnow()
         await db.commit()
         # Reload with labels eagerly loaded
-        card_query = select(Card).where(Card.id == card_id).options(selectinload(Card.labels))
-        result = await db.execute(card_query)
-        card = result.scalar_one()
+        card = await TaskService._load_card_with_labels(db, card_id)
         logger.info(f"Updated card: {card_id}")
         return card
 
@@ -286,9 +287,7 @@ class TaskService:
         await db.commit()
 
         # Reload card with labels
-        card_query = select(Card).where(Card.id == card_id).options(selectinload(Card.labels))
-        card_result = await db.execute(card_query)
-        card = card_result.scalar_one()
+        card = await TaskService._load_card_with_labels(db, card_id)
 
         logger.info(f"Added label {label_id} to card {card_id}")
         return card
