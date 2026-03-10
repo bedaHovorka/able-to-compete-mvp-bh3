@@ -123,7 +123,8 @@ def service_marked_as_down(client, headers):
         side_effect=Exception("Connection refused"),
     ):
         for _ in range(3):
-            client.post(f"/api/monitors/{monitor_id}/check", headers=headers)
+            r = client.post(f"/api/monitors/{monitor_id}/check", headers=headers)
+            assert r.status_code == 200, r.text
 
     return monitor
 
@@ -139,7 +140,8 @@ def service_returns_200(client, headers, downed_monitor):
         return_value=mock_ok,
     ):
         for _ in range(3):
-            client.post(f"/api/monitors/{monitor_id}/check", headers=headers)
+            r = client.post(f"/api/monitors/{monitor_id}/check", headers=headers)
+            assert r.status_code == 200, r.text
 
 
 @then("the incident should be auto-resolved")

@@ -1,5 +1,4 @@
 """BDD steps for task_management.feature — all step functions are sync (TestClient)."""
-import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
 scenarios("../features/task_management.feature")
@@ -36,8 +35,8 @@ def verify_audit_log(client, scenario_headers, created_board):
     r = client.get(
         f"/api/boards/{created_board['id']}/activity", headers=scenario_headers
     )
-    # Activity endpoint exists and is reachable — MVP-level audit check
     assert r.status_code == 200
+    assert len(r.json()) >= 1, f"Expected at least one activity entry, got: {r.json()}"
 
 
 # ── Scenario: Add a card to a list ───────────────────────────────────────────
