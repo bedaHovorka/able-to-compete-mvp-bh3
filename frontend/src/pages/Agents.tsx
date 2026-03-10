@@ -1,11 +1,27 @@
 import { useState } from 'react'
-import { Container, Card, Form, Button, Alert, Spinner, Badge } from 'react-bootstrap'
-import { Bot, FileText, TestTube2, Code2, ChevronRight } from 'lucide-react'
+import { Container, Card, Form, Button, Alert, Spinner, Badge, ButtonGroup } from 'react-bootstrap'
+import { Bot, FileText, TestTube2, Code2, ChevronRight, Copy, Check, Play, RotateCcw } from 'lucide-react'
 import { agents } from '../lib/api'
 
 type SpecType = 'general' | 'user_story' | 'bdd'
 type TestType = 'unit' | 'integration' | 'bdd'
 type DevType = 'api' | 'service' | 'general' | 'model' | 'util'
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Button variant="outline-secondary" size="sm" onClick={handleCopy} title="Copy to clipboard">
+      {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+    </Button>
+  )
+}
 
 export default function Agents() {
   // Spec agent state
@@ -28,6 +44,10 @@ export default function Agents() {
   const [devCode, setDevCode] = useState('')
   const [devLoading, setDevLoading] = useState(false)
   const [devError, setDevError] = useState<string | null>(null)
+
+  // Pipeline state
+  const [pipelineLoading, setPipelineLoading] = useState(false)
+  const [pipelineError, setPipelineError] = useState<string | null>(null)
 
   const handleGenerateSpec = async () => {
     if (!requirements.trim()) return
@@ -77,36 +97,113 @@ export default function Agents() {
     }
   }
 
+  const handleRunPipeline = async () => {
+    if (!requirements.trim()) return
+    setPipelineLoading(true)
+    setPipelineError(null)
+    setSpecError(null)
+    setTestError(null)
+    setDevError(null)
+    try {
+      const res = await agents.pipeline({
+        requirements: requirements.trim(),
+        run_steps: ['spec', 'test', 'dev'],
+      })
+      const { spec, tests, code, errors } = res.data
+      if (spec) {
+        setSpecification(spec)
+        setTestSpec(spec)
+        setDevSpec(spec)
+      }
+      if (tests) setTestCode(tests)
+      if (code) setDevCode(code)
+      if (errors.spec) setSpecError(errors.spec)
+      if (errors.test) setTestError(errors.test)
+      if (errors.dev) setDevError(errors.dev)
+    } catch (err) {
+      console.error('Pipeline error:', err)
+      setPipelineError('Pipeline run failed. Please try again.')
+    } finally {
+      setPipelineLoading(false)
+    }
+  }
+
+  const handleReset = () => {
+    setRequirements('')
+    setSpecification('')
+    setSpecError(null)
+    setTestSpec('')
+    setTestCode('')
+    setTestError(null)
+    setDevSpec('')
+    setDevCode('')
+    setDevError(null)
+    setPipelineError(null)
+  }
+
   const hasSpec = specification.trim().length > 0
+  const anyLoading = specLoading || testLoading || devLoading || pipelineLoading
 
   return (
     <Container className="py-4">
       {/* Page Header */}
-      <div className="d-flex align-items-center mb-4">
-        <Bot size={28} className="me-3 text-primary" />
-        <div>
-          <h2 className="mb-0 fw-bold">AI Agents</h2>
-          <p className="text-muted mb-0 small">Three-step pipeline: Spec → Tests → Code</p>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <div className="d-flex align-items-center">
+          <Bot size={28} className="me-3 text-primary" />
+          <div>
+            <h2 className="mb-0 fw-bold">AI Agents</h2>
+            <p className="text-muted mb-0 small">Three-step pipeline: Spec → Tests → Code</p>
+          </div>
         </div>
+        <Button variant="outline-secondary" size="sm" onClick={handleReset} disabled={anyLoading} title="Clear all outputs and start over">
+          <RotateCcw size={14} className="me-1" />
+          Reset
+        </Button>
       </div>
 
-      {/* Pipeline flow indicator */}
-      <div className="d-flex align-items-center gap-2 mb-4 flex-wrap">
-        <Badge bg="primary" className="d-flex align-items-center gap-1 px-3 py-2">
-          <FileText size={14} />
-          Step 1: Spec
-        </Badge>
-        <ChevronRight size={16} className="text-muted" />
-        <Badge bg={hasSpec ? 'success' : 'secondary'} className="d-flex align-items-center gap-1 px-3 py-2">
-          <TestTube2 size={14} />
-          Step 2: Tests
-        </Badge>
-        <ChevronRight size={16} className="text-muted" />
-        <Badge bg={hasSpec ? 'success' : 'secondary'} className="d-flex align-items-center gap-1 px-3 py-2">
-          <Code2 size={14} />
-          Step 3: Code
-        </Badge>
+      {/* Pipeline flow indicator + Run All button */}
+      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div className="d-flex align-items-center gap-2 flex-wrap">
+          <Badge bg="primary" className="d-flex align-items-center gap-1 px-3 py-2">
+            <FileText size={14} />
+            Step 1: Spec
+          </Badge>
+          <ChevronRight size={16} className="text-muted" />
+          <Badge bg={hasSpec ? 'success' : 'secondary'} className="d-flex align-items-center gap-1 px-3 py-2">
+            <TestTube2 size={14} />
+            Step 2: Tests
+          </Badge>
+          <ChevronRight size={16} className="text-muted" />
+          <Badge bg={hasSpec ? 'success' : 'secondary'} className="d-flex align-items-center gap-1 px-3 py-2">
+            <Code2 size={14} />
+            Step 3: Code
+          </Badge>
+        </div>
+        <Button
+          variant="primary"
+          onClick={handleRunPipeline}
+          disabled={pipelineLoading || !requirements.trim()}
+          title="Run all three steps automatically"
+        >
+          {pipelineLoading ? (
+            <>
+              <Spinner animation="border" size="sm" className="me-2" />
+              Running pipeline…
+            </>
+          ) : (
+            <>
+              <Play size={16} className="me-2" />
+              Run Full Pipeline
+            </>
+          )}
+        </Button>
       </div>
+
+      {pipelineError && (
+        <Alert variant="danger" dismissible onClose={() => setPipelineError(null)} className="mb-4">
+          {pipelineError}
+        </Alert>
+      )}
 
       {/* Step 1 — Spec Agent */}
       <Card className="mb-4 shadow-sm">
@@ -126,7 +223,7 @@ export default function Agents() {
                 placeholder="Describe the feature or system you want to specify..."
                 value={requirements}
                 onChange={(e) => setRequirements(e.target.value)}
-                disabled={specLoading}
+                disabled={specLoading || pipelineLoading}
               />
             </Form.Group>
             <div className="d-flex gap-3 align-items-end mb-3">
@@ -135,7 +232,7 @@ export default function Agents() {
                 <Form.Select
                   value={specType}
                   onChange={(e) => setSpecType(e.target.value as SpecType)}
-                  disabled={specLoading}
+                  disabled={specLoading || pipelineLoading}
                 >
                   <option value="general">General</option>
                   <option value="user_story">User Story</option>
@@ -145,7 +242,7 @@ export default function Agents() {
               <Button
                 variant="primary"
                 onClick={handleGenerateSpec}
-                disabled={specLoading || !requirements.trim()}
+                disabled={specLoading || pipelineLoading || !requirements.trim()}
               >
                 {specLoading ? (
                   <>
@@ -172,7 +269,9 @@ export default function Agents() {
             <div className="mt-3">
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <span className="fw-medium text-success">✓ Specification generated</span>
-                <small className="text-muted">Auto-populated in Steps 2 and 3</small>
+                <ButtonGroup size="sm">
+                  <CopyButton text={specification} />
+                </ButtonGroup>
               </div>
               <pre
                 className="bg-light border rounded p-3"
@@ -180,6 +279,7 @@ export default function Agents() {
               >
                 {specification}
               </pre>
+              <small className="text-muted">Auto-populated in Steps 2 and 3</small>
             </div>
           )}
         </Card.Body>
@@ -204,7 +304,7 @@ export default function Agents() {
                 placeholder="Paste or edit the specification to generate tests from…"
                 value={testSpec}
                 onChange={(e) => setTestSpec(e.target.value)}
-                disabled={testLoading}
+                disabled={testLoading || pipelineLoading}
               />
             </Form.Group>
             <div className="d-flex gap-3 align-items-end mb-3">
@@ -213,7 +313,7 @@ export default function Agents() {
                 <Form.Select
                   value={testType}
                   onChange={(e) => setTestType(e.target.value as TestType)}
-                  disabled={testLoading}
+                  disabled={testLoading || pipelineLoading}
                 >
                   <option value="unit">Unit</option>
                   <option value="integration">Integration</option>
@@ -223,7 +323,7 @@ export default function Agents() {
               <Button
                 variant="success"
                 onClick={handleGenerateTests}
-                disabled={testLoading || !testSpec.trim()}
+                disabled={testLoading || pipelineLoading || !testSpec.trim()}
               >
                 {testLoading ? (
                   <>
@@ -248,7 +348,10 @@ export default function Agents() {
 
           {testCode && (
             <div className="mt-3">
-              <span className="fw-medium text-success d-block mb-2">✓ Tests generated</span>
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <span className="fw-medium text-success">✓ Tests generated</span>
+                <CopyButton text={testCode} />
+              </div>
               <pre
                 className="bg-dark text-light border rounded p-3"
                 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.8125rem', maxHeight: '400px', overflowY: 'auto' }}
@@ -279,7 +382,7 @@ export default function Agents() {
                 placeholder="Paste or edit the specification to generate code from…"
                 value={devSpec}
                 onChange={(e) => setDevSpec(e.target.value)}
-                disabled={devLoading}
+                disabled={devLoading || pipelineLoading}
               />
             </Form.Group>
             <div className="d-flex gap-3 align-items-end mb-3">
@@ -288,7 +391,7 @@ export default function Agents() {
                 <Form.Select
                   value={devType}
                   onChange={(e) => setDevType(e.target.value as DevType)}
-                  disabled={devLoading}
+                  disabled={devLoading || pipelineLoading}
                 >
                   <option value="api">API</option>
                   <option value="service">Service</option>
@@ -300,7 +403,7 @@ export default function Agents() {
               <Button
                 variant="info"
                 onClick={handleGenerateCode}
-                disabled={devLoading || !devSpec.trim()}
+                disabled={devLoading || pipelineLoading || !devSpec.trim()}
               >
                 {devLoading ? (
                   <>
@@ -325,7 +428,10 @@ export default function Agents() {
 
           {devCode && (
             <div className="mt-3">
-              <span className="fw-medium text-info d-block mb-2">✓ Code generated</span>
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <span className="fw-medium text-info">✓ Code generated</span>
+                <CopyButton text={devCode} />
+              </div>
               <pre
                 className="bg-dark text-light border rounded p-3"
                 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.8125rem', maxHeight: '400px', overflowY: 'auto' }}

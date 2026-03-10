@@ -7,77 +7,77 @@ class SpecAgent(BaseAgent):
 
     def simulate_response(self, prompt: str) -> str:
         """Simulate specification generation"""
+        requirements = prompt.split("for: ", 1)[-1] if "for: " in prompt else prompt
         if "user story" in prompt.lower():
-            return """
-**User Story**: As a system administrator, I want to monitor website uptime so that I can quickly respond to outages.
+            return f"""
+**User Story**: As a user, I want to {requirements} so that I can achieve my goals efficiently.
 
 **Acceptance Criteria**:
-- Monitor should check URL every 60 seconds
-- System creates incident after 3 consecutive failures
-- Email and webhook alerts are sent when incident is created
-- Incident is auto-resolved when service recovers
-- Dashboard shows current status and uptime percentage
+- System should implement core functionality for: {requirements}
+- All primary use cases are covered and accessible
+- Error states are handled gracefully with clear messaging
+- Performance meets expected standards under normal load
+- Changes are persisted and reflected immediately in the UI
 
 **BDD Scenarios**:
 
-Scenario: Monitor detects service outage
-  Given a monitor is configured for "https://example.com"
-  And the monitor is enabled
-  When the service fails health checks 3 times
-  Then an incident should be created
-  And alerts should be sent to configured channels
+Scenario: Successfully complete primary action
+  Given I am an authenticated user
+  And the system is configured for "{requirements}"
+  When I perform the main action
+  Then the operation should complete successfully
+  And the result should be visible in the interface
 
-Scenario: Service recovery auto-resolves incident
-  Given an active incident exists for a monitor
-  When the service health check succeeds
-  Then the incident should be marked as resolved
-  And the resolution time should be recorded
+Scenario: Handle failure gracefully
+  Given I am using the system for "{requirements}"
+  When an error occurs during the operation
+  Then a clear error message should be displayed
+  And the system should remain in a consistent state
 """
         elif "bdd" in prompt.lower():
-            return """
-Feature: Task Board Management
+            return f"""
+Feature: {requirements}
 
-  Scenario: Create new task board
+  Scenario: Complete primary workflow
     Given I am an authenticated user
-    When I create a board with name "Sprint Planning"
-    Then the board should be created successfully
-    And I should see the board in my dashboard
+    When I initiate the main workflow for "{requirements}"
+    Then the system should process my request successfully
+    And I should see the updated state in the interface
 
-  Scenario: Add card to list
-    Given I have a board with a list
-    When I add a card titled "Implement login feature"
-    Then the card should appear in the list
-    And an activity log entry should be created
+  Scenario: Validate input and constraints
+    Given I am working with "{requirements}"
+    When I provide invalid or missing input
+    Then the system should show a validation error
+    And no data should be modified
 
-  Scenario: Move card between lists
-    Given I have a card in "To Do" list
-    When I move the card to "In Progress" list
-    Then the card should be in the new list
-    And the position should be updated
+  Scenario: Handle concurrent operations
+    Given multiple users are working with "{requirements}"
+    When they perform actions simultaneously
+    Then each operation should complete correctly
+    And data integrity should be maintained
 """
         else:
-            return """
+            return f"""
 **Generated Specification**:
 
-**Overview**: Task and monitoring management system
+**Overview**: {requirements}
 
 **Features**:
-1. Task Board Management
-   - Create/edit/delete boards
-   - Organize tasks in lists
-   - Drag-and-drop cards
-   - Label and categorize tasks
+1. Core Functionality
+   - Implement primary operations for the described system
+   - Support standard CRUD operations
+   - Real-time updates and notifications
+   - Data validation and error handling
 
-2. Monitoring System
-   - Configure HTTP/HTTPS monitors
-   - Automated health checks
-   - Incident detection and management
-   - Alert notifications
+2. User Interface
+   - Intuitive and responsive design
+   - Clear feedback for all user actions
+   - Accessible to all users
 
-3. Audit & Compliance
-   - Complete audit trail
-   - User activity logging
-   - Data change tracking
+3. Integration & API
+   - RESTful API endpoints
+   - Authentication and authorization
+   - Audit logging for all changes
 
 **Technical Requirements**:
 - RESTful API design

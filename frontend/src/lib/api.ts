@@ -112,6 +112,13 @@ export const incidents = {
     }),
 }
 
+export interface PipelineResponse {
+  spec: string | null
+  tests: string | null
+  code: string | null
+  errors: Record<string, string>
+}
+
 export const agents = {
   spec: (data: { requirements: string; type: string }) =>
     api.post<SpecResponse>('/agents/spec', data),
@@ -119,4 +126,6 @@ export const agents = {
     api.post<TestResponse>('/agents/test', data),
   dev: (data: { specification: string; type: string }) =>
     api.post<DevResponse>('/agents/dev', data),
+  pipeline: (data: { requirements: string; run_steps?: string[] }) =>
+    api.post<PipelineResponse>('/agents/pipeline', data),
 }

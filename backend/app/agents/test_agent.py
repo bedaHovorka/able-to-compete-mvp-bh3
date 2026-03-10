@@ -7,124 +7,202 @@ class TestAgent(BaseAgent):
 
     def simulate_response(self, prompt: str) -> str:
         """Simulate test generation"""
-        return """
+        subject = prompt.split("for: ", 1)[-1] if "for: " in prompt else prompt
+        resource = subject.replace(" ", "_").replace("-", "_").lower()[:30]
+        prompt_prefix = prompt.split("for:")[0].lower() if "for:" in prompt else prompt.lower()
+        if "integration" in prompt_prefix:
+            return f"""
 import pytest
-from app.services import TaskService, MonitorService
-from app.models import Board, Monitor, MonitorStatus
+from httpx import AsyncClient
+from app.main import app
+from app.utils.database import get_db
 
-class TestTaskService:
+
+@pytest.fixture
+async def client(db_session):
+    async def override_get_db():
+        yield db_session
+    app.dependency_overrides[get_db] = override_get_db
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
+
+
+class TestIntegration_{subject.replace(" ", "_").replace("-", "_")[:40]}:
     @pytest.mark.asyncio
-    async def test_create_board(self, db_session):
-        # Arrange
-        board_name = "Test Board"
-        board_description = "Test Description"
+    async def test_create_returns_201(self, client):
+        payload = {{"name": "test_{resource}", "description": "Integration test for {subject}"}}
+        response = await client.post("/api/{resource}s/", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == payload["name"]
+        assert "id" in data
+
+    @pytest.mark.asyncio
+    async def test_list_returns_200(self, client):
+        response = await client.get("/api/{resource}s/")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_get_by_id_returns_200(self, client):
+        create_resp = await client.post("/api/{resource}s/", json={{"name": "item_for_get"}})
+        item_id = create_resp.json()["id"]
+        response = await client.get(f"/api/{resource}s/{{item_id}}")
+        assert response.status_code == 200
+        assert response.json()["id"] == item_id
+
+    @pytest.mark.asyncio
+    async def test_get_nonexistent_returns_404(self, client):
+        response = await client.get("/api/{resource}s/00000000-0000-0000-0000-000000000000")
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_returns_204(self, client):
+        create_resp = await client.post("/api/{resource}s/", json={{"name": "item_to_delete"}})
+        item_id = create_resp.json()["id"]
+        response = await client.delete(f"/api/{resource}s/{{item_id}}")
+        assert response.status_code == 204
+"""
+        elif "bdd" in prompt_prefix:
+            return f"""
+# BDD tests for: {subject}
+import pytest
+from pytest_bdd import scenarios, given, when, then, parsers
+from httpx import AsyncClient
+from app.main import app
+
+scenarios("features/{resource}.feature")
+
+
+@pytest.fixture
+def context():
+    return {{}}
+
+
+@given("I am an authenticated user")
+def authenticated_user(context):
+    context["headers"] = {{"Authorization": "Bearer test-token"}}
+
+
+@given(parsers.parse('a {resource} named "{{name}}" exists'), target_fixture="existing_item")
+async def existing_item(name, db_session):
+    from app.services.{resource}_service import {resource.title()}Service
+    item = await {resource.title()}Service.create(db_session, name=name)
+    return item
+
+
+@when("I request to create a new item")
+async def create_item(context):
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/{resource}s/",
+            json={{"name": "new_{resource}", "description": "Created via BDD test"}},
+            headers=context.get("headers", {{}})
+        )
+        context["response"] = resp
+
+
+@when("I request the list of items")
+async def list_items(context):
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        resp = await client.get("/api/{resource}s/", headers=context.get("headers", {{}}))
+        context["response"] = resp
+
+
+@then("the response status should be 201")
+def status_201(context):
+    assert context["response"].status_code == 201
+
+
+@then("the response status should be 200")
+def status_200(context):
+    assert context["response"].status_code == 200
+
+
+@then("the response body should contain the created item")
+def body_contains_item(context):
+    data = context["response"].json()
+    assert "id" in data
+    assert data["name"] == "new_{resource}"
+
+
+@then("the response body should be a list")
+def body_is_list(context):
+    assert isinstance(context["response"].json(), list)
+"""
+        else:
+            return f"""
+import pytest
+
+
+class Test_{subject.replace(" ", "_").replace("-", "_")[:40]}:
+    @pytest.mark.asyncio
+    async def test_primary_operation_succeeds(self, db_session):
+        # Arrange - set up for: {subject}
+        input_data = {{"name": "test_item", "description": "Test for {subject}"}}
 
         # Act
-        board = await TaskService.create_board(
-            db_session,
-            name=board_name,
-            description=board_description
-        )
+        result = await service.create(db_session, **input_data)
 
         # Assert
-        assert board is not None
-        assert board.name == board_name
-        assert board.description == board_description
-        assert board.id is not None
+        assert result is not None
+        assert result.name == input_data["name"]
+        assert result.id is not None
 
     @pytest.mark.asyncio
-    async def test_create_list_in_board(self, db_session, test_board):
+    async def test_retrieve_existing_item(self, db_session, test_item):
+        # Act
+        result = await service.get(db_session, test_item.id)
+
+        # Assert
+        assert result is not None
+        assert result.id == test_item.id
+
+    @pytest.mark.asyncio
+    async def test_update_item(self, db_session, test_item):
         # Arrange
-        list_name = "To Do"
+        update_data = {{"name": "updated_name"}}
 
         # Act
-        list_obj = await TaskService.create_list(
-            db_session,
-            board_id=test_board.id,
-            name=list_name
-        )
+        updated = await service.update(db_session, test_item.id, **update_data)
 
         # Assert
-        assert list_obj is not None
-        assert list_obj.name == list_name
-        assert list_obj.board_id == test_board.id
+        assert updated.name == update_data["name"]
 
-class TestMonitorService:
     @pytest.mark.asyncio
-    async def test_create_monitor(self, db_session, monitor_service):
-        # Arrange
-        monitor_name = "Test API"
-        monitor_url = "https://api.example.com/health"
-
+    async def test_delete_item(self, db_session, test_item):
         # Act
-        monitor = await monitor_service.create_monitor(
-            db_session,
-            name=monitor_name,
-            url=monitor_url
-        )
+        success = await service.delete(db_session, test_item.id)
 
         # Assert
-        assert monitor is not None
-        assert monitor.name == monitor_name
-        assert monitor.url == monitor_url
-        assert monitor.status == MonitorStatus.PAUSED
+        assert success is True
+        result = await service.get(db_session, test_item.id)
+        assert result is None
 
     @pytest.mark.asyncio
-    async def test_execute_health_check(self, db_session, monitor_service, test_monitor):
+    async def test_invalid_input_raises_error(self, db_session):
+        # Act & Assert
+        with pytest.raises((ValueError, Exception)):
+            await service.create(db_session, name=None)
+
+    @pytest.mark.asyncio
+    async def test_not_found_returns_none(self, db_session):
         # Act
-        check = await monitor_service.execute_check(db_session, test_monitor)
+        result = await service.get(db_session, id=9999999)
 
         # Assert
-        assert check is not None
-        assert check.monitor_id == test_monitor.id
-        assert check.status in [MonitorStatus.UP, MonitorStatus.DOWN, MonitorStatus.DEGRADED]
-        assert check.checked_at is not None
+        assert result is None
 
-    @pytest.mark.asyncio
-    async def test_incident_creation_on_failures(self, db_session, monitor_service):
-        # Arrange
-        monitor = await monitor_service.create_monitor(
-            db_session,
-            name="Failing Service",
-            url="https://definitely-not-real-url-12345.com"
-        )
-
-        # Act - Simulate 3 failures
-        for _ in range(3):
-            await monitor_service.execute_check(db_session, monitor)
-
-        # Assert - Incident should be created
-        from sqlalchemy import select
-        from app.models import Incident
-        query = select(Incident).where(Incident.monitor_id == monitor.id)
-        result = await db_session.execute(query)
-        incident = result.scalar_one_or_none()
-
-        assert incident is not None
-        assert incident.monitor_id == monitor.id
 
 # Fixtures
 @pytest.fixture
-async def test_board(db_session):
-    board = await TaskService.create_board(
+async def test_item(db_session):
+    item = await service.create(
         db_session,
-        name="Test Board"
+        name="Test Item for {subject}"
     )
-    return board
-
-@pytest.fixture
-async def test_monitor(db_session, monitor_service):
-    monitor = await monitor_service.create_monitor(
-        db_session,
-        name="Test Monitor",
-        url="https://example.com"
-    )
-    return monitor
-
-@pytest.fixture
-def monitor_service():
-    from app.services import MonitorService
-    return MonitorService()
+    return item
 """
 
     async def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
