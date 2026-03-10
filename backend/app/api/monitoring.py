@@ -305,7 +305,7 @@ async def get_dashboard_metrics(
         uptime_data = await monitor_service.calculate_uptime(db, monitor.id, hours=24)
         total_uptime += uptime_data["uptime_percentage"]
 
-    avg_uptime = total_uptime / total_monitors if total_monitors > 0 else 100.0
+    avg_uptime = total_uptime / len(monitors) if monitors else 100.0
 
     return DashboardMetrics(
         total_monitors=total_monitors,
