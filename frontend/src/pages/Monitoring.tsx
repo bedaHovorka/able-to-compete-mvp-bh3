@@ -187,7 +187,7 @@ export default function Monitoring() {
       const res = await incidents.analyzeWithAI(incidentId, state.analysisType)
       setIncidentAnalysis((prev) => ({
         ...prev,
-        [incidentId]: { ...prev[incidentId], isPending: false, result: res.data },
+        [incidentId]: { ...(prev[incidentId] ?? DEFAULT_ANALYSIS_STATE), isPending: false, result: res.data },
       }))
     } catch (err) {
       const message =
@@ -195,7 +195,7 @@ export default function Monitoring() {
       setIncidentAnalysis((prev) => ({
         ...prev,
         [incidentId]: {
-          ...prev[incidentId],
+          ...(prev[incidentId] ?? DEFAULT_ANALYSIS_STATE),
           isPending: false,
           error: message,
         },
