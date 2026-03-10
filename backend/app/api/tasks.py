@@ -25,9 +25,7 @@ class BoardResponse(BaseModel):
     description: Optional[str]
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ListCreate(BaseModel):
@@ -41,9 +39,7 @@ class ListResponse(BaseModel):
     name: str
     position: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CardCreate(BaseModel):
@@ -92,9 +88,7 @@ class CardResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     labels: List[LabelResponse] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ListWithCardsResponse(BaseModel):
@@ -104,9 +98,7 @@ class ListWithCardsResponse(BaseModel):
     position: int
     created_at: datetime
     cards: List[CardResponse] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BoardWithListsResponse(BaseModel):
@@ -116,9 +108,7 @@ class BoardWithListsResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     lists: List[ListWithCardsResponse] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ActivityResponse(BaseModel):
@@ -128,9 +118,7 @@ class ActivityResponse(BaseModel):
     entity_id: uuid.UUID
     details: Optional[str]
     timestamp: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommentCreate(BaseModel):
