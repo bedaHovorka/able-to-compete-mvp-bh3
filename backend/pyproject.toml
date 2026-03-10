@@ -39,6 +39,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "real_llm: marks tests that require ANTHROPIC_API_KEY",
+]
 
 [dependency-groups]
 dev = [

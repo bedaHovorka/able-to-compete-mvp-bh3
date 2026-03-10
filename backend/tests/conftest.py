@@ -11,6 +11,7 @@ Key design decisions:
 - Per-test failure_counts reset prevents cross-test monitoring state pollution.
 """
 import asyncio
+import os
 import uuid
 
 import pytest
@@ -23,6 +24,15 @@ from app.models import Board, Card
 from app.models import List as ListModel
 from app.models.monitor import Incident, IncidentSeverity, Monitor, MonitorType
 from app.utils.database import Base, get_db
+
+
+# ── Marker: skip @real_llm tests when ANTHROPIC_API_KEY is not set ────────────
+
+def pytest_collection_modifyitems(items):
+    skip_real_llm = pytest.mark.skip(reason="ANTHROPIC_API_KEY not set")
+    for item in items:
+        if "real_llm" in item.keywords and not os.getenv("ANTHROPIC_API_KEY"):
+            item.add_marker(skip_real_llm)
 
 
 # ── Session-scoped event loop (required for session-scoped async fixtures) ────
