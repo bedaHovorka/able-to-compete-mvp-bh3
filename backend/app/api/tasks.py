@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.database import get_db
 from app.utils.auth import get_current_active_user
-from app.services import TaskService, CommentService, DeleteResult
+from app.services import TaskService, CommentService, DeleteResult, AddLabelResult
 from app.models.task import CardPriority
 from app.api.websocket import broadcast_update
 from pydantic import BaseModel, ConfigDict, Field
@@ -403,12 +403,12 @@ async def attach_label_to_card(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Card or label not found"
         )
-    if result == "cross_board":
+    if result == AddLabelResult.CROSS_BOARD:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Label does not belong to the same board as the card"
         )
-    if result == "duplicate":
+    if result == AddLabelResult.DUPLICATE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Label is already attached to this card"

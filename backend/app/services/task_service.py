@@ -16,6 +16,11 @@ class DeleteResult(enum.Enum):
     FORBIDDEN = "forbidden"
 
 
+class AddLabelResult(str, enum.Enum):
+    CROSS_BOARD = "cross_board"
+    DUPLICATE = "duplicate"
+
+
 class TaskService:
     @staticmethod
     async def create_board(db: AsyncSession, name: str, description: Optional[str] = None, user_id: Optional[uuid.UUID] = None) -> Board:
@@ -248,8 +253,8 @@ class TaskService:
     @staticmethod
     async def add_label_to_card(
         db: AsyncSession, card_id: uuid.UUID, label_id: uuid.UUID
-    ) -> Union[Card, str, None]:
-        """Attach a label to a card. Returns Card on success, 'cross_board' or 'duplicate' on error, None if not found."""
+    ) -> Union[Card, AddLabelResult, None]:
+        """Attach a label to a card. Returns Card on success, AddLabelResult on error, None if not found."""
         # Load card with its list
         card_query = select(Card).where(Card.id == card_id).options(
             selectinload(Card.list),
@@ -271,11 +276,11 @@ class TaskService:
 
         # Validate label belongs to the same board as the card
         if label.board_id != card.list.board_id:
-            return "cross_board"
+            return AddLabelResult.CROSS_BOARD
 
         # Check for duplicate
         if any(lbl.id == label_id for lbl in card.labels):
-            return "duplicate"
+            return AddLabelResult.DUPLICATE
 
         card.labels.append(label)
         await db.commit()
